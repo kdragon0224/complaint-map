@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 
 const KakaoMap = dynamic(() => import('@/components/KakaoMap'), { ssr: false });
 
@@ -122,16 +123,21 @@ export default function Home() {
     <div className="min-h-screen flex flex-col bg-gray-50">
 
       {/* 헤더 */}
-      <header className="bg-[#0d2d6b] text-white px-4 py-2 flex items-center gap-2.5 shadow-lg z-10 shrink-0">
-        {/* EX CI 로고 */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/ex-logo.png" alt="EX" style={{ height: '13px', width: 'auto', flexShrink: 0 }} />
-        <div>
-          <h1 className="font-bold leading-tight tracking-tight" style={{ fontSize: '14.6px' }}>
-            도로 관리주체 확인앱{' '}
-            <span className="text-blue-200 font-normal" style={{ fontSize: '11px' }}>(한국도로공사 전북본부 제작)</span>
-          </h1>
+      <header className="bg-[#0d2d6b] text-white px-4 py-2 flex items-center justify-between shadow-lg z-10 shrink-0">
+        <div className="flex items-center gap-2.5">
+          {/* EX CI 로고 */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/ex-logo.png" alt="EX" style={{ height: '13px', width: 'auto', flexShrink: 0 }} />
+          <div>
+            <h1 className="font-bold leading-tight tracking-tight" style={{ fontSize: '14.6px' }}>
+              도로 관리주체 확인앱{' '}
+              <span className="text-blue-200 font-normal" style={{ fontSize: '11px' }}>(한국도로공사 전북본부 제작)</span>
+            </h1>
+          </div>
         </div>
+        <Link href="/feedback" className="text-blue-200 hover:text-white text-xs transition-colors shrink-0">
+          💬 피드백
+        </Link>
       </header>
 
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden" style={{ height: 'calc(100vh - 56px)' }}>
