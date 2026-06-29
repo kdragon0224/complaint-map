@@ -206,41 +206,39 @@ export default function Home() {
                   <div className={`p-4 ${
                     isPrivate ? 'bg-amber-50' : 'bg-gradient-to-br from-blue-50 to-indigo-50'
                   }`}>
-                    {/* 기관명 */}
-                    <p className="text-xl font-bold text-gray-900 leading-snug">{rec.agencyFull}</p>
+                    {/* 1줄: 기관명 */}
+                    <p className="text-base font-bold text-gray-900 leading-snug">{rec.agencyFull}</p>
 
-                    {/* 전화번호 — 기관명 바로 아래 강조 */}
-                    {agencyPhone && (
-                      <a
-                        href={`tel:${agencyPhone}`}
-                        className="mt-2 inline-flex items-center gap-2 text-lg font-bold text-blue-700 hover:text-blue-900 transition-colors"
-                      >
-                        <span>📞</span>
-                        <span>{agencyPhone}</span>
-                      </a>
-                    )}
+                    {/* 2줄: 노선 + 이정 — 기관명과 동일 크기·굵기 */}
+                    <p className="mt-1 text-base font-bold text-gray-900">
+                      <span className={`text-xs px-1.5 py-0.5 rounded font-semibold mr-1.5 align-middle ${
+                        rec.roadType === '고속국도' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {rec.roadType}
+                      </span>
+                      {rec.routeName.replace(/\s*\(.*?\)/, '')}
+                      {rec.routeName.match(/\(([^)]+)\)/) && (
+                        <span className="ml-1">{rec.routeName.match(/\(([^)]+)\)/)?.[1]} 지점</span>
+                      )}
+                    </p>
 
                     {/* 구분선 */}
                     <div className="mt-3 pt-3 border-t border-black/10 space-y-1.5">
-                      {/* 노선 + 이정 */}
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${
-                          rec.roadType === '고속국도' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
-                        }`}>
-                          {rec.roadType}
-                        </span>
-                        <span className="text-sm text-gray-700 font-medium">
-                          {rec.routeName.replace(/\(.*?\)/, '').trim()}
-                        </span>
-                        <span className="text-sm font-bold text-gray-900">
-                          {rec.routeName.match(/\(([^)]+)\)/)?.[1]} 지점
-                        </span>
-                      </div>
+                      {/* 전화번호 */}
+                      {agencyPhone && (
+                        <a
+                          href={`tel:${agencyPhone}`}
+                          className="flex items-center gap-2 text-base font-bold text-blue-700 hover:text-blue-900 transition-colors"
+                        >
+                          <span>📞</span>
+                          <span>{agencyPhone}</span>
+                        </a>
+                      )}
 
-                      {/* 주소 */}
+                      {/* 사무실 주소 */}
                       {agencyAddress && (
-                        <p className="flex items-start gap-1.5 text-xs text-gray-400">
-                          <span className="shrink-0">📍</span>
+                        <p className="flex items-start gap-1.5 text-xs text-gray-500">
+                          <span className="shrink-0 text-gray-400">(사무실)</span>
                           <span>{agencyAddress}</span>
                         </p>
                       )}
