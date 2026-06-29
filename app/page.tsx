@@ -243,18 +243,18 @@ export default function Home() {
                         </p>
                       )}
 
-                      {/* 이격 거리 — 항상 표시, 200m 초과 시 경고 스타일 */}
-                      <p className={`flex items-center gap-1.5 text-xs font-medium ${
-                        rec.distanceM > 200 ? 'text-amber-600' : 'text-gray-400'
-                      }`}>
-                        <span>{rec.distanceM > 200 ? '⚠️' : '📏'}</span>
-                        <span>
-                          핀이 관리노선에서{' '}
-                          {rec.distanceM >= 1000
-                            ? `${(rec.distanceM / 1000).toFixed(1)}km`
-                            : `${Math.round(rec.distanceM)}m`} 떨어져 있습니다
-                        </span>
-                      </p>
+                      {/* 이격 경고 — 200m 초과 시만 */}
+                      {rec.distanceM > 200 && (
+                        <p className="flex items-center gap-1.5 text-xs text-amber-600 font-medium">
+                          <span>⚠️</span>
+                          <span>
+                            핀이 관리노선에서{' '}
+                            {rec.distanceM >= 1000
+                              ? `${(rec.distanceM / 1000).toFixed(1)}km`
+                              : `${Math.round(rec.distanceM)}m`} 떨어져 있습니다
+                          </span>
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
