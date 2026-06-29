@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase, Post, Comment } from '@/lib/supabase';
 import Link from 'next/link';
 
+const ADMIN_PASSWORD = '2504';
+
 function timeAgo(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime();
   const m = Math.floor(diff / 60000);
@@ -25,6 +27,12 @@ export default function FeedbackPage() {
   const [comments, setComments] = useState<Record<number, Comment[]>>({});
   const [commentNick, setCommentNick] = useState('');
   const [commentText, setCommentText] = useState('');
+
+  // 관리자
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [showAdminLogin, setShowAdminLogin] = useState(false);
+  const [adminPw, setAdminPw] = useState('');
+  const [adminError, setAdminError] = useState('');
 
   const fetchPosts = useCallback(async () => {
     const { data } = await supabase
@@ -53,6 +61,18 @@ export default function FeedbackPage() {
     setPosts(prev => prev.map(p => p.id === post.id ? { ...p, likes: p.likes + 1 } : p));
   };
 
+  const deletePost = async (postId: number) => {
+    if (!confirm('이 게시글을 삭제하시겠습니까?')) return;
+    await supabase.from('posts').delete().eq('id', postId);
+    setPosts(prev => prev.filter(p => p.id !== postId));
+  };
+
+  const deleteComment = async (postId: number, commentId: number) => {
+    if (!confirm('이 댓글을 삭제하시겠습니까?')) return;
+    await supabase.from('comments').delete().eq('id', commentId);
+    setComments(prev => ({ ...prev, [postId]: prev[postId].filter(c => c.id !== commentId) }));
+  };
+
   const toggleComments = async (postId: number) => {
     if (expandedPost === postId) { setExpandedPost(null); return; }
     setExpandedPost(postId);
@@ -73,6 +93,17 @@ export default function FeedbackPage() {
     }
   };
 
+  const handleAdminLogin = () => {
+    if (adminPw === ADMIN_PASSWORD) {
+      setIsAdmin(true);
+      setShowAdminLogin(false);
+      setAdminPw('');
+      setAdminError('');
+    } else {
+      setAdminError('비밀번호가 틀렸습니다.');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* 헤더 */}
@@ -80,23 +111,61 @@ export default function FeedbackPage() {
         <div className="flex items-center gap-2.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/ex-logo.png" alt="EX" style={{ height: '13px', width: 'auto' }} />
-          <h1 className="font-bold" style={{ fontSize: '14.6px' }}>
-            사용자 피드백 게시판
-          </h1>
+          <h1 className="font-bold" style={{ fontSize: '14.6px' }}>오류 신고 게시판</h1>
         </div>
-        <Link href="/" className="text-blue-200 text-xs hover:text-white transition-colors">
-          ← 앱으로 돌아가기
-        </Link>
+        <div className="flex items-center gap-2">
+          {isAdmin ? (
+            <button onClick={() => setIsAdmin(false)} className="text-yellow-300 text-xs font-semibold">
+              🔓 관리자 모드
+            </button>
+          ) : (
+            <button onClick={() => setShowAdminLogin(true)} className="text-blue-300 text-xs hover:text-white transition-colors">
+              관리자
+            </button>
+          )}
+          <Link href="/" className="bg-yellow-400 hover:bg-yellow-300 text-[#0d2d6b] text-xs font-bold px-3 py-1.5 rounded-full transition-colors">
+            ← 앱으로
+          </Link>
+        </div>
       </header>
 
+      {/* 관리자 로그인 모달 */}
+      {showAdminLogin && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
+            <h2 className="font-bold text-gray-800 mb-4">관리자 로그인</h2>
+            <input
+              type="password"
+              value={adminPw}
+              onChange={e => setAdminPw(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleAdminLogin()}
+              placeholder="비밀번호 입력"
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 mb-2"
+              autoFocus
+            />
+            {adminError && <p className="text-red-500 text-xs mb-2">{adminError}</p>}
+            <div className="flex gap-2 justify-end mt-3">
+              <button onClick={() => { setShowAdminLogin(false); setAdminPw(''); setAdminError(''); }} className="px-4 py-2 text-sm text-gray-500">취소</button>
+              <button onClick={handleAdminLogin} className="bg-[#0d2d6b] text-white px-5 py-2 rounded-xl text-sm font-semibold">확인</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <main className="flex-1 max-w-2xl w-full mx-auto p-4 flex flex-col gap-4">
+        {isAdmin && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-2 text-sm text-yellow-800 font-medium">
+            🔓 관리자 모드 — 게시글과 댓글을 삭제할 수 있습니다
+          </div>
+        )}
+
         {/* 글쓰기 버튼 */}
         {!showWrite ? (
           <button
             onClick={() => setShowWrite(true)}
             className="w-full bg-white border-2 border-dashed border-gray-200 rounded-2xl px-4 py-3 text-left text-gray-400 text-sm hover:border-blue-300 hover:text-gray-500 transition-colors"
           >
-            ✏️ 사용 후기나 개선 의견을 남겨주세요...
+            ✏️ 오류 내용이나 개선 의견을 남겨주세요...
           </button>
         ) : (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col gap-3">
@@ -110,7 +179,7 @@ export default function FeedbackPage() {
             <textarea
               value={content}
               onChange={e => setContent(e.target.value)}
-              placeholder="내용을 입력하세요 (최대 500자)"
+              placeholder="오류 내용 또는 개선 의견을 입력하세요 (최대 500자)"
               rows={4}
               maxLength={500}
               className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
@@ -136,61 +205,70 @@ export default function FeedbackPage() {
         ) : posts.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
             <div className="text-4xl mb-3">💬</div>
-            <p>아직 등록된 피드백이 없습니다.</p>
+            <p>아직 등록된 내용이 없습니다.</p>
             <p className="text-sm mt-1">첫 번째 의견을 남겨주세요!</p>
           </div>
         ) : (
           posts.map(post => (
             <div key={post.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              {/* 게시글 본문 */}
               <div className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm">
-                    {post.nickname[0]}
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm shrink-0">
+                      {post.nickname[0]}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">{post.nickname}</p>
+                      <p className="text-xs text-gray-400">{timeAgo(post.created_at)}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800">{post.nickname}</p>
-                    <p className="text-xs text-gray-400">{timeAgo(post.created_at)}</p>
-                  </div>
+                  {isAdmin && (
+                    <button
+                      onClick={() => deletePost(post.id)}
+                      className="shrink-0 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 px-2 py-1 rounded-lg transition-colors font-medium"
+                    >
+                      🗑 삭제
+                    </button>
+                  )}
                 </div>
                 <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{post.content}</p>
               </div>
 
-              {/* 액션 버튼 */}
               <div className="px-4 pb-3 flex items-center gap-4 border-t border-gray-50 pt-3">
-                <button
-                  onClick={() => toggleLike(post)}
-                  className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-red-500 transition-colors"
-                >
-                  <span>❤️</span>
-                  <span>{post.likes}</span>
+                <button onClick={() => toggleLike(post)} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-red-500 transition-colors">
+                  <span>❤️</span><span>{post.likes}</span>
                 </button>
-                <button
-                  onClick={() => toggleComments(post.id)}
-                  className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-blue-500 transition-colors"
-                >
-                  <span>💬</span>
-                  <span>댓글</span>
-                  {expandedPost === post.id ? ' ▲' : ' ▼'}
+                <button onClick={() => toggleComments(post.id)} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-blue-500 transition-colors">
+                  <span>💬</span><span>댓글 {expandedPost === post.id ? '▲' : '▼'}</span>
                 </button>
               </div>
 
-              {/* 댓글 영역 */}
               {expandedPost === post.id && (
                 <div className="border-t border-gray-100 bg-gray-50 p-4 flex flex-col gap-3">
                   {(comments[post.id] || []).map(c => (
-                    <div key={c.id} className="flex gap-2">
+                    <div key={c.id} className="flex gap-2 items-start">
                       <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-bold text-xs shrink-0">
                         {c.nickname[0]}
                       </div>
-                      <div>
-                        <span className="text-xs font-semibold text-gray-700">{c.nickname}</span>
-                        <span className="text-xs text-gray-400 ml-1.5">{timeAgo(c.created_at)}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="text-xs font-semibold text-gray-700">{c.nickname}</span>
+                            <span className="text-xs text-gray-400 ml-1.5">{timeAgo(c.created_at)}</span>
+                          </div>
+                          {isAdmin && (
+                            <button
+                              onClick={() => deleteComment(post.id, c.id)}
+                              className="text-xs text-red-400 hover:text-red-600 px-1.5 py-0.5 rounded transition-colors"
+                            >
+                              🗑
+                            </button>
+                          )}
+                        </div>
                         <p className="text-sm text-gray-600 mt-0.5">{c.content}</p>
                       </div>
                     </div>
                   ))}
-                  {/* 댓글 입력 */}
                   <div className="flex gap-2 mt-1">
                     <input
                       value={commentNick}
@@ -207,10 +285,7 @@ export default function FeedbackPage() {
                       className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
                       maxLength={200}
                     />
-                    <button
-                      onClick={() => submitComment(post.id)}
-                      className="bg-[#0d2d6b] text-white px-3 py-1.5 rounded-lg text-xs font-semibold"
-                    >
+                    <button onClick={() => submitComment(post.id)} className="bg-[#0d2d6b] text-white px-3 py-1.5 rounded-lg text-xs font-semibold">
                       등록
                     </button>
                   </div>
