@@ -31,12 +31,6 @@ interface AnalysisResult {
   altCandidates: RoadCandidate[];
 }
 
-const CONFIDENCE_CONFIG = {
-  높음: { dot: 'bg-emerald-400', text: '신뢰도 높음' },
-  보통: { dot: 'bg-amber-400',   text: '신뢰도 보통' },
-  낮음: { dot: 'bg-red-400',     text: '신뢰도 낮음' },
-};
-
 const DEFAULT_LAT = 37.5665;
 const DEFAULT_LNG = 126.9784;
 
@@ -47,13 +41,11 @@ export default function Home() {
   const [showMap, setShowMap] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
-  const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState('');
   const [pinAddress, setPinAddress] = useState<{ road: string; jibun: string } | null>(null);
   const [agencyPhone, setAgencyPhone] = useState<string | null>(null);
   const [agencyAddress, setAgencyAddress] = useState<string | null>(null);
 
-  // 카카오 Place Search로 기관 전화번호 조회
   useEffect(() => {
     const agencyFull = result?.recommendation?.agencyFull;
     if (!agencyFull) { setAgencyPhone(null); setAgencyAddress(null); return; }
@@ -76,7 +68,6 @@ export default function Home() {
   const analyze = useCallback(async (lat: number, lng: number, addr?: string) => {
     setLoading(true);
     setResult(null);
-    setConfirmed(false);
     try {
       const params = new URLSearchParams({ lat: String(lat), lng: String(lng) });
       if (addr) params.set('address', addr);
@@ -118,7 +109,6 @@ export default function Home() {
   }, [analyze]);
 
   const rec = result?.recommendation;
-  const conf = rec ? CONFIDENCE_CONFIG[rec.confidence] : null;
   const isPrivate = rec && !rec.agencyFull.startsWith('한국도로공사');
 
   return (
@@ -127,7 +117,6 @@ export default function Home() {
       {/* 헤더 */}
       <header className="bg-[#0d2d6b] text-white px-4 py-2 flex items-center justify-between shadow-lg z-10 shrink-0">
         <div className="flex items-center gap-2.5">
-          {/* EX CI 로고 */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/ex-logo.png" alt="EX" style={{ height: '13px', width: 'auto', flexShrink: 0 }} />
           <div>
@@ -176,18 +165,18 @@ export default function Home() {
               <div className="mt-2 text-xs">
                 {pinAddress ? (
                   <div className="space-y-0.5">
-                    {pinAddress.road ? (
+                    {pinAddress.road && (
                       <p className="text-gray-600 flex items-start gap-1">
                         <span className="shrink-0 bg-blue-100 text-blue-700 font-semibold px-1 rounded">도로명</span>
                         <span>{pinAddress.road}</span>
                       </p>
-                    ) : null}
-                    {pinAddress.jibun ? (
+                    )}
+                    {pinAddress.jibun && (
                       <p className="text-gray-500 flex items-start gap-1">
                         <span className="shrink-0 bg-gray-100 text-gray-600 font-semibold px-1 rounded">지번</span>
                         <span>{pinAddress.jibun}</span>
                       </p>
-                    ) : null}
+                    )}
                     {!pinAddress.road && !pinAddress.jibun && (
                       <p className="text-gray-400">주소 정보 없음</p>
                     )}
@@ -209,84 +198,58 @@ export default function Home() {
 
           {/* 결과 */}
           {result && !loading && (
-            <div className="flex-1 flex flex-col p-4 gap-4">
+            <div className="flex-1 flex flex-col p-4">
               {rec ? (
-                <>
-                  {/* 메인 결과 카드 */}
-                  <div className={`rounded-2xl overflow-hidden shadow-sm border ${
-                    confirmed
-                      ? 'border-emerald-200'
-                      : isPrivate
-                        ? 'border-amber-200'
-                        : 'border-blue-100'
+                <div className={`rounded-2xl overflow-hidden shadow-sm border ${
+                  isPrivate ? 'border-amber-200' : 'border-blue-100'
+                }`}>
+                  <div className={`p-4 ${
+                    isPrivate ? 'bg-amber-50' : 'bg-gradient-to-br from-blue-50 to-indigo-50'
                   }`}>
-                    {/* 카드 본문 */}
-                    <div className={`p-4 ${
-                      confirmed ? 'bg-emerald-50' : isPrivate ? 'bg-amber-50' : 'bg-gradient-to-br from-blue-50 to-indigo-50'
-                    }`}>
-                      <p className="text-xl font-bold text-gray-900 leading-snug">{rec.agencyFull}</p>
-                      <div className="flex items-center gap-2 mt-2 flex-wrap">
-                        <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${
-                          rec.roadType === '고속국도' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
-                        }`}>
-                          {rec.roadType}
-                        </span>
-                        <span className="text-sm text-gray-600">{rec.routeName}</span>
-                      </div>
-                      <div className="mt-2 flex items-center gap-1.5 text-xs text-gray-500">
-                        <span>📏</span>
-                        <span>
-                          핀 위치에서 관리노선까지{' '}
-                          <span className="font-semibold text-gray-700">
-                            {rec.distanceM >= 1000
-                              ? `${(rec.distanceM / 1000).toFixed(1)}km`
-                              : `${Math.round(rec.distanceM)}m`}
-                          </span>
-                          {rec.distanceM > 200 && (
-                            <span className="ml-1 text-amber-600 font-medium">(이격 주의)</span>
-                          )}
-                        </span>
-                      </div>
-                      {(agencyPhone || agencyAddress) && (
-                        <div className="mt-3 pt-3 border-t border-black/10 space-y-1">
-                          {agencyPhone && (
-                            <a
-                              href={`tel:${agencyPhone}`}
-                              className="flex items-center gap-2 text-sm font-semibold text-blue-700 hover:text-blue-900 transition-colors"
-                            >
-                              <span>📞</span>
-                              <span>{agencyPhone}</span>
-                            </a>
-                          )}
-                          {agencyAddress && (
-                            <p className="flex items-start gap-2 text-xs text-gray-500">
-                              <span className="shrink-0">📍</span>
-                              <span>{agencyAddress}</span>
-                            </p>
-                          )}
-                        </div>
-                      )}
+                    <p className="text-xl font-bold text-gray-900 leading-snug">{rec.agencyFull}</p>
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${
+                        rec.roadType === '고속국도' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {rec.roadType}
+                      </span>
+                      <span className="text-sm text-gray-600">{rec.routeName}</span>
                     </div>
+                    <div className="mt-2 flex items-center gap-1.5 text-xs text-gray-500">
+                      <span>📏</span>
+                      <span>
+                        핀 위치에서 관리노선까지{' '}
+                        <span className="font-semibold text-gray-700">
+                          {rec.distanceM >= 1000
+                            ? `${(rec.distanceM / 1000).toFixed(1)}km`
+                            : `${Math.round(rec.distanceM)}m`}
+                        </span>
+                        {rec.distanceM > 200 && (
+                          <span className="ml-1 text-amber-600 font-medium">(이격 주의)</span>
+                        )}
+                      </span>
+                    </div>
+                    {(agencyPhone || agencyAddress) && (
+                      <div className="mt-3 pt-3 border-t border-black/10 space-y-1">
+                        {agencyPhone && (
+                          <a
+                            href={`tel:${agencyPhone}`}
+                            className="flex items-center gap-2 text-sm font-semibold text-blue-700 hover:text-blue-900 transition-colors"
+                          >
+                            <span>📞</span>
+                            <span>{agencyPhone}</span>
+                          </a>
+                        )}
+                        {agencyAddress && (
+                          <p className="flex items-start gap-2 text-xs text-gray-500">
+                            <span className="shrink-0">📍</span>
+                            <span>{agencyAddress}</span>
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
-
-                  {/* 확인 버튼 */}
-                  {!confirmed ? (
-                    <button
-                      onClick={() => setConfirmed(true)}
-                      className="w-full bg-[#0d2d6b] hover:bg-[#1a3f8f] active:scale-[0.98] text-white font-bold py-3.5 rounded-2xl text-sm transition-all shadow-md hover:shadow-lg"
-                    >
-                      ✅ 담당자 확인
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => setConfirmed(false)}
-                      className="w-full bg-gray-100 hover:bg-gray-200 text-gray-500 font-medium py-3 rounded-2xl text-sm transition-colors"
-                    >
-                      다시 확인
-                    </button>
-                  )}
-
-                </>
+                </div>
               ) : (
                 <div className="flex-1 flex flex-col items-center justify-center gap-3 py-8 text-center">
                   <div className="text-4xl">🔍</div>
