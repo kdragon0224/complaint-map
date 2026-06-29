@@ -73,12 +73,14 @@ export default function Home() {
     }, { size: 1 });
   }, [result?.recommendation?.agencyFull]);
 
-  const analyze = useCallback(async (lat: number, lng: number) => {
+  const analyze = useCallback(async (lat: number, lng: number, addr?: string) => {
     setLoading(true);
     setResult(null);
     setConfirmed(false);
     try {
-      const res = await fetch(`/api/analyze?lat=${lat}&lng=${lng}`);
+      const params = new URLSearchParams({ lat: String(lat), lng: String(lng) });
+      if (addr) params.set('address', addr);
+      const res = await fetch(`/api/analyze?${params}`);
       const data = await res.json();
       setResult(data);
     } catch {
@@ -102,7 +104,7 @@ export default function Home() {
       setPinLat(lat);
       setPinLng(lng);
       setShowMap(true);
-      await analyze(lat, lng);
+      await analyze(lat, lng, address.trim());
     } catch {
       setError('주소 검색 중 오류가 발생했습니다.');
       setLoading(false);
