@@ -206,48 +206,58 @@ export default function Home() {
                   <div className={`p-4 ${
                     isPrivate ? 'bg-amber-50' : 'bg-gradient-to-br from-blue-50 to-indigo-50'
                   }`}>
+                    {/* 기관명 */}
                     <p className="text-xl font-bold text-gray-900 leading-snug">{rec.agencyFull}</p>
-                    <div className="flex items-center gap-2 mt-2 flex-wrap">
-                      <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${
-                        rec.roadType === '고속국도' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
-                      }`}>
-                        {rec.roadType}
-                      </span>
-                      <span className="text-sm text-gray-600">{rec.routeName}</span>
-                    </div>
-                    <div className="mt-2 flex items-center gap-1.5 text-xs text-gray-500">
-                      <span>📏</span>
-                      <span>
-                        핀 위치에서 관리노선까지{' '}
-                        <span className="font-semibold text-gray-700">
-                          {rec.distanceM >= 1000
-                            ? `${(rec.distanceM / 1000).toFixed(1)}km`
-                            : `${Math.round(rec.distanceM)}m`}
-                        </span>
-                        {rec.distanceM > 200 && (
-                          <span className="ml-1 text-amber-600 font-medium">(이격 주의)</span>
-                        )}
-                      </span>
-                    </div>
-                    {(agencyPhone || agencyAddress) && (
-                      <div className="mt-3 pt-3 border-t border-black/10 space-y-1">
-                        {agencyPhone && (
-                          <a
-                            href={`tel:${agencyPhone}`}
-                            className="flex items-center gap-2 text-sm font-semibold text-blue-700 hover:text-blue-900 transition-colors"
-                          >
-                            <span>📞</span>
-                            <span>{agencyPhone}</span>
-                          </a>
-                        )}
-                        {agencyAddress && (
-                          <p className="flex items-start gap-2 text-xs text-gray-500">
-                            <span className="shrink-0">📍</span>
-                            <span>{agencyAddress}</span>
-                          </p>
-                        )}
-                      </div>
+
+                    {/* 전화번호 — 기관명 바로 아래 강조 */}
+                    {agencyPhone && (
+                      <a
+                        href={`tel:${agencyPhone}`}
+                        className="mt-2 inline-flex items-center gap-2 text-lg font-bold text-blue-700 hover:text-blue-900 transition-colors"
+                      >
+                        <span>📞</span>
+                        <span>{agencyPhone}</span>
+                      </a>
                     )}
+
+                    {/* 구분선 */}
+                    <div className="mt-3 pt-3 border-t border-black/10 space-y-1.5">
+                      {/* 노선 + 이정 */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${
+                          rec.roadType === '고속국도' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
+                        }`}>
+                          {rec.roadType}
+                        </span>
+                        <span className="text-sm text-gray-700 font-medium">
+                          {rec.routeName.replace(/\(.*?\)/, '').trim()}
+                        </span>
+                        <span className="text-sm font-bold text-gray-900">
+                          {rec.routeName.match(/\(([^)]+)\)/)?.[1]} 지점
+                        </span>
+                      </div>
+
+                      {/* 주소 */}
+                      {agencyAddress && (
+                        <p className="flex items-start gap-1.5 text-xs text-gray-400">
+                          <span className="shrink-0">📍</span>
+                          <span>{agencyAddress}</span>
+                        </p>
+                      )}
+
+                      {/* 이격 경고 — 200m 초과 시만 */}
+                      {rec.distanceM > 200 && (
+                        <p className="flex items-center gap-1.5 text-xs text-amber-600 font-medium">
+                          <span>⚠️</span>
+                          <span>
+                            핀이 관리노선에서{' '}
+                            {rec.distanceM >= 1000
+                              ? `${(rec.distanceM / 1000).toFixed(1)}km`
+                              : `${Math.round(rec.distanceM)}m`} 떨어져 있습니다
+                          </span>
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               ) : (
