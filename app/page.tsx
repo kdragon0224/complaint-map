@@ -135,8 +135,8 @@ export default function Home() {
             </h1>
           </div>
         </div>
-        <Link href="/feedback" className="text-blue-200 hover:text-white text-xs transition-colors shrink-0">
-          💬 피드백
+        <Link href="/feedback" className="bg-yellow-400 hover:bg-yellow-300 text-[#0d2d6b] text-xs font-bold px-3 py-1.5 rounded-full transition-colors shrink-0 whitespace-nowrap shadow-sm">
+          🚨 오류 신고하기
         </Link>
       </header>
 
@@ -230,6 +230,20 @@ export default function Home() {
                           {rec.roadType}
                         </span>
                         <span className="text-sm text-gray-600">{rec.routeName}</span>
+                      </div>
+                      <div className="mt-2 flex items-center gap-1.5 text-xs text-gray-500">
+                        <span>📏</span>
+                        <span>
+                          핀 위치에서 관리노선까지{' '}
+                          <span className="font-semibold text-gray-700">
+                            {rec.distanceM >= 1000
+                              ? `${(rec.distanceM / 1000).toFixed(1)}km`
+                              : `${Math.round(rec.distanceM)}m`}
+                          </span>
+                          {rec.distanceM > 200 && (
+                            <span className="ml-1 text-amber-600 font-medium">(이격 주의)</span>
+                          )}
+                        </span>
                       </div>
                       {(agencyPhone || agencyAddress) && (
                         <div className="mt-3 pt-3 border-t border-black/10 space-y-1">
