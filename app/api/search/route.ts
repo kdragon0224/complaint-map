@@ -7,6 +7,9 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+// 기관별 전화번호·주소 캐시 (프로세스 재시작 전까지 유지, ~30개 기관으로 충분)
+const placeCache = new Map<string, { phone: string | null; address: string | null }>();
+
 const HIGHWAY_KEYWORDS = [
   'IC', 'JC', '인터체인지', '분기점', '휴게소', 'SA',
   '한국도로공사', '도로공사', '고속도로',
@@ -49,6 +52,7 @@ async function fetchPlaceInfo(
   agencyFull: string,
   key: string,
 ): Promise<{ phone: string | null; address: string | null }> {
+  if (placeCache.has(agencyFull)) return placeCache.get(agencyFull)!;
   try {
     const res = await fetch(
       `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(agencyFull)}&size=1`,
@@ -56,14 +60,15 @@ async function fetchPlaceInfo(
     );
     const data = await res.json();
     const place = data.documents?.[0];
-    if (place) {
-      return {
-        phone: place.phone || null,
-        address: place.road_address_name || place.address_name || null,
-      };
-    }
-  } catch {}
-  return { phone: null, address: null };
+    const result = {
+      phone: place?.phone || null,
+      address: place?.road_address_name || place?.address_name || null,
+    };
+    placeCache.set(agencyFull, result);
+    return result;
+  } catch {
+    return { phone: null, address: null };
+  }
 }
 
 export async function GET(req: NextRequest) {

@@ -1,6 +1,9 @@
 /**
- * 도로 분석 및 관리주체 추천 엔진
- * 서버 사이드에서만 실행 (그리드 JSON 파일 읽기)
+ * 도로 분석 및 관리주체 추천 엔진 (서버 사이드 전용)
+ *
+ * 데이터 파일 키 약어 (압축 포맷):
+ *   highway-grid.json:       r=routeNo, n=routeName, k=km, a=lat, o=lng
+ *   national-road-grid.json: r=routeNo, g=agency,    f=agencyFull, a=lat, o=lng
  */
 
 import fs from 'fs';
@@ -9,7 +12,8 @@ import { formatAgency } from './highway-jurisdiction';
 
 const DATA_DIR = path.join(process.cwd(), 'public', 'data');
 const GRID_SIZE = 0.1;
-const SEARCH_RADIUS_M = 500; // 탐색 반경 500m
+const SEARCH_RADIUS_M = 500;
+const HIGHWAY_PRIORITY_THRESHOLD_M = 200; // 고속도로가 이 거리 이내면 국도 탐색 생략
 
 // ── 타입 ────────────────────────────────────────────────────────────────
 
@@ -66,37 +70,82 @@ function neighborKeys(lat: number, lng: number): string[] {
   return [...new Set(keys)];
 }
 
-// ── 그리드 로더 (모듈 캐시로 재사용) ──────────────────────────────────
+// ── 그리드 로더 (모듈 캐시 — 프로세스 재시작 전까지 유지) ─────────────
 
-type GridPoint = Record<string, string | number>;
-type Grid = Record<string, GridPoint[]>;
+type HwPoint  = { r: string; n: string; k: number; a: number; o: number };
+type NatPoint = { r: string; g: string; f: string; a: number; o: number };
+type HwGrid   = Record<string, HwPoint[]>;
+type NatGrid  = Record<string, NatPoint[]>;
+type NodePoint = Record<string, string | number>;
 
-let _natGrid: Grid | null = null;
-let _hwGrid: Grid | null = null;
-let _hwNodes: GridPoint[] | null = null;
+let _hwGrid:   HwGrid   | null = null;
+let _natGrid:  NatGrid  | null = null;
+let _hwNodes:  NodePoint[] | null = null;
 
-function loadNatGrid(): Grid {
-  if (!_natGrid) {
-    _natGrid = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'national-road-grid.json'), 'utf-8'));
-  }
-  return _natGrid!;
-}
-
-function loadHwGrid(): Grid {
-  if (!_hwGrid) {
-    _hwGrid = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'highway-grid.json'), 'utf-8'));
-  }
+function loadHwGrid(): HwGrid {
+  if (!_hwGrid) _hwGrid = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'highway-grid.json'), 'utf-8'));
   return _hwGrid!;
 }
 
-function loadHwNodes(): GridPoint[] {
-  if (!_hwNodes) {
-    _hwNodes = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'highway-nodes.json'), 'utf-8'));
-  }
+function loadNatGrid(): NatGrid {
+  if (!_natGrid) _natGrid = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'national-road-grid.json'), 'utf-8'));
+  return _natGrid!;
+}
+
+function loadHwNodes(): NodePoint[] {
+  if (!_hwNodes) _hwNodes = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'highway-nodes.json'), 'utf-8'));
   return _hwNodes!;
 }
 
-// ── 주변 도로 탐색 ──────────────────────────────────────────────────────
+// ── 고속도로 탐색 ────────────────────────────────────────────────────────
+
+function findNearbyHighways(lat: number, lng: number): RoadCandidate[] {
+  const grid = loadHwGrid();
+  const nodes = loadHwNodes();
+  const keys = neighborKeys(lat, lng);
+
+  const nearPoints: { r: string; n: string; k: number; dist: number }[] = [];
+
+  for (const key of keys) {
+    for (const p of grid[key] ?? []) {
+      const dist = haversineM(lat, lng, p.a, p.o);
+      if (dist <= SEARCH_RADIUS_M) nearPoints.push({ r: p.r, n: p.n, k: p.k, dist });
+    }
+  }
+
+  if (nearPoints.length === 0) return [];
+  nearPoints.sort((a, b) => a.dist - b.dist);
+
+  const results: RoadCandidate[] = [];
+  const seen = new Set<string>();
+
+  for (const pt of nearPoints) {
+    if (seen.has(pt.r)) continue;
+    seen.add(pt.r);
+
+    const routeNodes = nodes.filter(n => n.routeNo === parseInt(pt.r).toString());
+    const prevNode = routeNodes
+      .filter(n => (n.km as number) <= pt.k)
+      .sort((a, b) => (b.km as number) - (a.km as number))[0];
+
+    const fallbackIc = prevNode ? String(prevNode.name) : undefined;
+    const agency = formatAgency(pt.r, pt.k, fallbackIc);
+
+    results.push({
+      type: '고속국도',
+      routeNo: pt.r,
+      routeName: `${pt.n} (${pt.k.toFixed(1)}km)`,
+      agency,
+      agencyFull: agency,
+      distanceM: Math.round(pt.dist),
+      km: pt.k,
+    });
+  }
+
+  return results;
+}
+
+// ── 국도 탐색 (고속도로 미발견 또는 200m 초과 시에만 실행) ───────────────
 
 function findNearbyNationalRoads(lat: number, lng: number): RoadCandidate[] {
   const grid = loadNatGrid();
@@ -105,20 +154,18 @@ function findNearbyNationalRoads(lat: number, lng: number): RoadCandidate[] {
   const seen = new Set<string>();
 
   for (const key of keys) {
-    const points = grid[key] || [];
-    for (const p of points) {
-      const dist = haversineM(lat, lng, p.lat as number, p.lng as number);
+    for (const p of grid[key] ?? []) {
+      const dist = haversineM(lat, lng, p.a, p.o);
       if (dist > SEARCH_RADIUS_M) continue;
-      // 같은 노선의 가장 가까운 포인트만
-      const uid = `${p.type}_${p.routeNo}`;
+      const uid = p.r;
       if (seen.has(uid)) continue;
       seen.add(uid);
       results.push({
         type: '일반국도',
-        routeNo: String(p.routeNo),
-        routeName: `국도 ${p.routeNo}호선`,
-        agency: String(p.agency),
-        agencyFull: String(p.agencyFull),
+        routeNo: p.r,
+        routeName: `국도 ${p.r}호선`,
+        agency: p.g,
+        agencyFull: p.f,
         distanceM: Math.round(dist),
       });
     }
@@ -127,67 +174,11 @@ function findNearbyNationalRoads(lat: number, lng: number): RoadCandidate[] {
   return results.sort((a, b) => a.distanceM - b.distanceM);
 }
 
-function findNearbyHighways(lat: number, lng: number): RoadCandidate[] {
-  const grid = loadHwGrid();
-  const nodes = loadHwNodes();
-  const keys = neighborKeys(lat, lng);
-  const results: RoadCandidate[] = [];
-  const seen = new Set<string>();
-
-  // 중심선 포인트에서 가장 가까운 구간 탐색
-  const nearPoints: { routeNo: string; routeName: string; km: number; dist: number }[] = [];
-  for (const key of keys) {
-    const points = grid[key] || [];
-    for (const p of points) {
-      const dist = haversineM(lat, lng, p.lat as number, p.lng as number);
-      if (dist > SEARCH_RADIUS_M) continue;
-      nearPoints.push({
-        routeNo: String(p.routeNo),
-        routeName: String(p.routeName),
-        km: p.km as number,
-        dist,
-      });
-    }
-  }
-  if (nearPoints.length === 0) return [];
-
-  nearPoints.sort((a, b) => a.dist - b.dist);
-
-  for (const pt of nearPoints) {
-    const uid = pt.routeNo;
-    if (seen.has(uid)) continue;
-    seen.add(uid);
-
-    // 이정(km)에 해당하는 담당 지사 찾기 (jurisdiction 테이블 우선)
-    const routeNodes = nodes.filter(
-      (n) => n.routeNo === parseInt(pt.routeNo).toString()
-    );
-    const prevNode = routeNodes
-      .filter((n) => (n.km as number) <= pt.km)
-      .sort((a, b) => (b.km as number) - (a.km as number))[0];
-
-    const fallbackIc = prevNode ? String(prevNode.name) : undefined;
-    const agency = formatAgency(pt.routeNo, pt.km, fallbackIc);
-
-    results.push({
-      type: '고속국도',
-      routeNo: pt.routeNo,
-      routeName: `${pt.routeName} (${pt.km.toFixed(1)}km)`,
-      agency,
-      agencyFull: agency,
-      distanceM: Math.round(pt.dist),
-      km: pt.km,
-    });
-  }
-
-  return results;
-}
-
-// ── 신뢰도 계산 ─────────────────────────────────────────────────────────
+// ── 신뢰도 계산 ──────────────────────────────────────────────────────────
 
 function calcConfidence(
   top: RoadCandidate,
-  candidates: RoadCandidate[]
+  candidates: RoadCandidate[],
 ): '높음' | '보통' | '낮음' {
   if (top.distanceM > 300) return '낮음';
   if (candidates.length >= 3 && candidates[1].distanceM < top.distanceM + 100) return '보통';
@@ -195,31 +186,23 @@ function calcConfidence(
   return '보통';
 }
 
-// ── 메인 분석 함수 ──────────────────────────────────────────────────────
+// ── 메인 분석 함수 ───────────────────────────────────────────────────────
 
 export function analyzeRoad(lat: number, lng: number): AnalysisResult {
   const highways = findNearbyHighways(lat, lng);
-  const nationalRoads = findNearbyNationalRoads(lat, lng);
 
-  // 고속국도 우선, 그다음 국도
-  const all = [...highways, ...nationalRoads].sort(
-    (a, b) => a.distanceM - b.distanceM
-  );
+  // 가까운 고속도로가 있으면 국도 탐색 생략 (2.4MB 파싱 회피)
+  const skipNational = highways.length > 0 && highways[0].distanceM <= HIGHWAY_PRIORITY_THRESHOLD_M;
+  const nationalRoads = skipNational ? [] : findNearbyNationalRoads(lat, lng);
+
+  const all = [...highways, ...nationalRoads].sort((a, b) => a.distanceM - b.distanceM);
 
   if (all.length === 0) {
-    return {
-      candidates: [],
-      recommendation: null,
-      altCandidates: [],
-    };
+    return { candidates: [], recommendation: null, altCandidates: [] };
   }
 
   const top = all[0];
   const confidence = calcConfidence(top, all);
-
-  const reason =
-    `민원 위치에서 ${top.distanceM}m 거리의 ` +
-    `${top.type}(${top.routeName})을 기준으로 추천`;
 
   return {
     candidates: all.slice(0, 5),
@@ -229,7 +212,7 @@ export function analyzeRoad(lat: number, lng: number): AnalysisResult {
       roadType: top.type,
       routeName: top.routeName,
       confidence,
-      reason,
+      reason: `민원 위치에서 ${top.distanceM}m 거리의 ${top.type}(${top.routeName})을 기준으로 추천`,
       distanceM: top.distanceM,
     },
     altCandidates: all.slice(1, 3),
