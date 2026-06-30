@@ -108,7 +108,6 @@ export async function GET(req: NextRequest) {
   const roadResult = analyzeRoad(lat, lng);
   const rec = roadResult.recommendation;
 
-  // 도로 분석 + 전화번호 조회 결과를 함께 반환 (이미 analyzeRoad는 동기)
   const placeInfo = rec?.agencyFull && key
     ? await fetchPlaceInfo(rec.agencyFull, key)
     : { phone: null, address: null };
