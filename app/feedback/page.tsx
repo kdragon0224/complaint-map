@@ -25,8 +25,7 @@ export default function FeedbackPage() {
   const [submitting, setSubmitting] = useState(false);
   const [expandedPost, setExpandedPost] = useState<number | null>(null);
   const [comments, setComments] = useState<Record<number, Comment[]>>({});
-  const [commentNick, setCommentNick] = useState('');
-  const [commentText, setCommentText] = useState('');
+  const [commentInputs, setCommentInputs] = useState<Record<number, { nick: string; text: string }>>({});
 
   // 관리자
   const [isAdmin, setIsAdmin] = useState(false);
@@ -83,13 +82,14 @@ export default function FeedbackPage() {
   };
 
   const submitComment = async (postId: number) => {
-    if (!commentNick.trim() || !commentText.trim()) return;
+    const { nick = '', text = '' } = commentInputs[postId] || {};
+    if (!nick.trim() || !text.trim()) return;
     const { data } = await supabase.from('comments').insert({
-      post_id: postId, nickname: commentNick.trim(), content: commentText.trim()
+      post_id: postId, nickname: nick.trim(), content: text.trim()
     }).select().single();
     if (data) {
       setComments(prev => ({ ...prev, [postId]: [...(prev[postId] || []), data] }));
-      setCommentText('');
+      setCommentInputs(prev => ({ ...prev, [postId]: { nick: prev[postId]?.nick ?? '', text: '' } }));
     }
   };
 
@@ -271,15 +271,15 @@ export default function FeedbackPage() {
                   ))}
                   <div className="flex gap-2 mt-1">
                     <input
-                      value={commentNick}
-                      onChange={e => setCommentNick(e.target.value)}
+                      value={commentInputs[post.id]?.nick ?? ''}
+                      onChange={e => setCommentInputs(prev => ({ ...prev, [post.id]: { ...prev[post.id], nick: e.target.value } }))}
                       placeholder="닉네임"
                       className="w-20 border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
                       maxLength={10}
                     />
                     <input
-                      value={commentText}
-                      onChange={e => setCommentText(e.target.value)}
+                      value={commentInputs[post.id]?.text ?? ''}
+                      onChange={e => setCommentInputs(prev => ({ ...prev, [post.id]: { ...prev[post.id], text: e.target.value } }))}
                       onKeyDown={e => e.key === 'Enter' && submitComment(post.id)}
                       placeholder="댓글을 입력하세요"
                       className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"

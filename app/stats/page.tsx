@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 
@@ -54,46 +54,41 @@ export default function StatsPage() {
     else setPwError('비밀번호가 틀렸습니다.');
   };
 
-  // 통계 계산
-  const total = logs.length;
-  const found = logs.filter(l => l.found).length;
-  const notFound = total - found;
+  // 통계 계산 (logs 변경 시에만 재계산)
+  const { total, found, notFound, topAgencies, dailyEntries, maxDaily, hourCount, maxHour } = useMemo(() => {
+    const total = logs.length;
+    const found = logs.filter(l => l.found).length;
 
-  // 기관별 집계
-  const agencyCount: Record<string, number> = {};
-  for (const l of logs) {
-    if (l.result_agency_full) {
-      agencyCount[l.result_agency_full] = (agencyCount[l.result_agency_full] || 0) + 1;
+    const agencyCount: Record<string, number> = {};
+    for (const l of logs) {
+      if (l.result_agency_full) {
+        agencyCount[l.result_agency_full] = (agencyCount[l.result_agency_full] || 0) + 1;
+      }
     }
-  }
-  const topAgencies = Object.entries(agencyCount)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10);
+    const topAgencies = Object.entries(agencyCount).sort((a, b) => b[1] - a[1]).slice(0, 10);
 
-  // 일별 집계 (최근 14일)
-  const dailyCount: Record<string, number> = {};
-  const now = new Date();
-  for (let i = 13; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    const key = d.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', month: '2-digit', day: '2-digit' });
-    dailyCount[key] = 0;
-  }
-  for (const l of logs) {
-    const key = formatDateShort(l.queried_at);
-    if (key in dailyCount) dailyCount[key]++;
-  }
-  const dailyEntries = Object.entries(dailyCount);
-  const maxDaily = Math.max(...dailyEntries.map(e => e[1]), 1);
+    const dailyCount: Record<string, number> = {};
+    const now = new Date();
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      dailyCount[d.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', month: '2-digit', day: '2-digit' })] = 0;
+    }
+    for (const l of logs) {
+      const key = formatDateShort(l.queried_at);
+      if (key in dailyCount) dailyCount[key]++;
+    }
+    const dailyEntries = Object.entries(dailyCount);
+    const maxDaily = Math.max(...dailyEntries.map(e => e[1]), 1);
 
-  // 시간대별 집계
-  const hourCount = Array(24).fill(0);
-  for (const l of logs) {
-    const h = new Date(l.queried_at).getUTCHours();
-    const kh = (h + 9) % 24;
-    hourCount[kh]++;
-  }
-  const maxHour = Math.max(...hourCount, 1);
+    const hourCount = Array(24).fill(0);
+    for (const l of logs) {
+      const kh = (new Date(l.queried_at).getUTCHours() + 9) % 24;
+      hourCount[kh]++;
+    }
+
+    return { total, found, notFound: total - found, topAgencies, dailyEntries, maxDaily, hourCount, maxHour: Math.max(...hourCount, 1) };
+  }, [logs]);
 
   if (!isAdmin) {
     return (
