@@ -20,8 +20,6 @@ interface SearchResult {
   lat: number;
   lng: number;
   recommendation: Recommendation | null;
-  agencyPhone: string | null;
-  agencyAddress: string | null;
 }
 
 const DEFAULT_LAT = 37.5665;
@@ -189,35 +187,18 @@ export default function Home() {
                       )}
                     </p>
 
-                    {/* 구분선 */}
-                    <div className="mt-3 pt-3 border-t border-black/10 space-y-1.5">
-                      {result.agencyPhone && (
-                        <a
-                          href={`tel:${result.agencyPhone}`}
-                          className="flex items-center gap-2 text-base font-bold text-blue-700 hover:text-blue-900 transition-colors"
-                        >
-                          <span>📞</span>
-                          <span>{result.agencyPhone}</span>
-                        </a>
-                      )}
-                      {result.agencyAddress && (
-                        <p className="flex items-start gap-1.5 text-xs text-gray-500">
-                          <span className="shrink-0 text-gray-400">(사무실)</span>
-                          <span>{result.agencyAddress}</span>
-                        </p>
-                      )}
-                      {rec.distanceM > 200 && (
-                        <p className="flex items-center gap-1.5 text-xs text-amber-600 font-medium">
-                          <span>⚠️</span>
-                          <span>
-                            핀이 관리노선에서{' '}
-                            {rec.distanceM >= 1000
-                              ? `${(rec.distanceM / 1000).toFixed(1)}km`
-                              : `${Math.round(rec.distanceM)}m`} 떨어져 있습니다
-                          </span>
-                        </p>
-                      )}
-                    </div>
+                    {/* 이격 경고 */}
+                    {rec.distanceM > 200 && (
+                      <p className="mt-3 pt-3 border-t border-black/10 flex items-center gap-1.5 text-xs text-amber-600 font-medium">
+                        <span>⚠️</span>
+                        <span>
+                          핀이 관리노선에서{' '}
+                          {rec.distanceM >= 1000
+                            ? `${(rec.distanceM / 1000).toFixed(1)}km`
+                            : `${Math.round(rec.distanceM)}m`} 떨어져 있습니다
+                        </span>
+                      </p>
+                    )}
                   </div>
                 </div>
               ) : (

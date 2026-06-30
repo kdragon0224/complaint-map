@@ -7,9 +7,6 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// 기관별 전화번호·주소 캐시 (프로세스 재시작 전까지 유지, ~30개 기관으로 충분)
-const placeCache = new Map<string, { phone: string | null; address: string | null }>();
-
 const HIGHWAY_KEYWORDS = [
   'IC', 'JC', '인터체인지', '분기점', '휴게소', 'SA',
   '한국도로공사', '도로공사', '고속도로',
@@ -46,29 +43,6 @@ async function geocode(
   const sorted = [...kwDocs].sort((a, b) => highwayScore(b) - highwayScore(a));
   const doc = sorted[0];
   return { lat: parseFloat(doc.y), lng: parseFloat(doc.x), placeName: doc.place_name };
-}
-
-async function fetchPlaceInfo(
-  agencyFull: string,
-  key: string,
-): Promise<{ phone: string | null; address: string | null }> {
-  if (placeCache.has(agencyFull)) return placeCache.get(agencyFull)!;
-  try {
-    const res = await fetch(
-      `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(agencyFull)}&size=1`,
-      { headers: { Authorization: `KakaoAK ${key}` } },
-    );
-    const data = await res.json();
-    const place = data.documents?.[0];
-    const result = {
-      phone: place?.phone || null,
-      address: place?.road_address_name || place?.address_name || null,
-    };
-    placeCache.set(agencyFull, result);
-    return result;
-  } catch {
-    return { phone: null, address: null };
-  }
 }
 
 export async function GET(req: NextRequest) {
@@ -108,10 +82,6 @@ export async function GET(req: NextRequest) {
   const roadResult = analyzeRoad(lat, lng);
   const rec = roadResult.recommendation;
 
-  const placeInfo = rec?.agencyFull && key
-    ? await fetchPlaceInfo(rec.agencyFull, key)
-    : { phone: null, address: null };
-
   // 백그라운드 로그 저장
   supabase.from('query_logs').insert({
     input_address: inputAddress,
@@ -126,12 +96,5 @@ export async function GET(req: NextRequest) {
     found: !!rec,
   }).then(() => {});
 
-  return NextResponse.json({
-    lat,
-    lng,
-    placeName,
-    ...roadResult,
-    agencyPhone: placeInfo.phone,
-    agencyAddress: placeInfo.address,
-  });
+  return NextResponse.json({ lat, lng, placeName, ...roadResult });
 }
