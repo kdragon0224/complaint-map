@@ -1,19 +1,10 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 
 const KakaoMap = dynamic(() => import('@/components/KakaoMap'), { ssr: false });
-
-interface RoadCandidate {
-  type: string;
-  routeNo: string;
-  routeName: string;
-  agency: string;
-  agencyFull: string;
-  distanceM: number;
-}
 
 interface Recommendation {
   agency: string;
@@ -25,10 +16,12 @@ interface Recommendation {
   distanceM: number;
 }
 
-interface AnalysisResult {
-  candidates: RoadCandidate[];
+interface SearchResult {
+  lat: number;
+  lng: number;
   recommendation: Recommendation | null;
-  altCandidates: RoadCandidate[];
+  agencyPhone: string | null;
+  agencyAddress: string | null;
 }
 
 const DEFAULT_LAT = 37.5665;
@@ -39,74 +32,48 @@ export default function Home() {
   const [pinLat, setPinLat] = useState(DEFAULT_LAT);
   const [pinLng, setPinLng] = useState(DEFAULT_LNG);
   const [showMap, setShowMap] = useState(false);
-  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [result, setResult] = useState<SearchResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [pinAddress, setPinAddress] = useState<{ road: string; jibun: string } | null>(null);
-  const [agencyPhone, setAgencyPhone] = useState<string | null>(null);
-  const [agencyAddress, setAgencyAddress] = useState<string | null>(null);
 
-  useEffect(() => {
-    const agencyFull = result?.recommendation?.agencyFull;
-    if (!agencyFull) { setAgencyPhone(null); setAgencyAddress(null); return; }
-
-    const kakao = (window as any).kakao;
-    if (!kakao?.maps?.services?.Places) return;
-
-    const ps = new kakao.maps.services.Places();
-    ps.keywordSearch(agencyFull, (data: any[], status: string) => {
-      if (status === kakao.maps.services.Status.OK && data[0]) {
-        setAgencyPhone(data[0].phone || null);
-        setAgencyAddress(data[0].road_address_name || data[0].address_name || null);
-      } else {
-        setAgencyPhone(null);
-        setAgencyAddress(null);
-      }
-    }, { size: 1 });
-  }, [result?.recommendation?.agencyFull]);
-
-  const analyze = useCallback(async (lat: number, lng: number, addr?: string) => {
+  const search = useCallback(async (params: { query: string } | { lat: number; lng: number }) => {
     setLoading(true);
-    setResult(null);
+    setError('');
     try {
-      const params = new URLSearchParams({ lat: String(lat), lng: String(lng) });
-      if (addr) params.set('address', addr);
-      const res = await fetch(`/api/analyze?${params}`);
-      const data = await res.json();
+      const qs = 'query' in params
+        ? `query=${encodeURIComponent(params.query)}`
+        : `lat=${params.lat}&lng=${params.lng}`;
+      const res = await fetch(`/api/search?${qs}`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || '주소를 찾을 수 없습니다.');
+        return;
+      }
+      const data: SearchResult = await res.json();
       setResult(data);
+      if ('query' in params) {
+        setPinLat(data.lat);
+        setPinLng(data.lng);
+        setShowMap(true);
+      }
     } catch {
-      setError('분석 중 오류가 발생했습니다.');
+      setError('검색 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const handleSearch = async () => {
+  const handleSearch = () => {
     if (!address.trim()) return;
-    setError('');
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/geocode?query=${encodeURIComponent(address)}`);
-      const data = await res.json();
-      const doc = data.documents?.[0];
-      if (!doc) { setError('주소를 찾을 수 없습니다.'); setLoading(false); return; }
-      const lat = parseFloat(doc.y);
-      const lng = parseFloat(doc.x);
-      setPinLat(lat);
-      setPinLng(lng);
-      setShowMap(true);
-      await analyze(lat, lng, address.trim());
-    } catch {
-      setError('주소 검색 중 오류가 발생했습니다.');
-      setLoading(false);
-    }
+    search({ query: address.trim() });
   };
 
   const handlePinMove = useCallback((lat: number, lng: number) => {
     setPinLat(lat);
     setPinLng(lng);
-    analyze(lat, lng);
-  }, [analyze]);
+    search({ lat, lng });
+  }, [search]);
 
   const rec = result?.recommendation;
   const isPrivate = rec && !rec.agencyFull.startsWith('한국도로공사');
@@ -209,7 +176,7 @@ export default function Home() {
                     {/* 1줄: 기관명 */}
                     <p className="text-base font-bold text-gray-900 leading-snug">{rec.agencyFull}</p>
 
-                    {/* 2줄: 노선 + 이정 — 기관명과 동일 크기·굵기 */}
+                    {/* 2줄: 노선 + 이정 */}
                     <p className="mt-1 text-base font-bold text-gray-900">
                       <span className={`text-xs px-1.5 py-0.5 rounded font-semibold mr-1.5 align-middle ${
                         rec.roadType === '고속국도' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
@@ -224,26 +191,21 @@ export default function Home() {
 
                     {/* 구분선 */}
                     <div className="mt-3 pt-3 border-t border-black/10 space-y-1.5">
-                      {/* 전화번호 */}
-                      {agencyPhone && (
+                      {result.agencyPhone && (
                         <a
-                          href={`tel:${agencyPhone}`}
+                          href={`tel:${result.agencyPhone}`}
                           className="flex items-center gap-2 text-base font-bold text-blue-700 hover:text-blue-900 transition-colors"
                         >
                           <span>📞</span>
-                          <span>{agencyPhone}</span>
+                          <span>{result.agencyPhone}</span>
                         </a>
                       )}
-
-                      {/* 사무실 주소 */}
-                      {agencyAddress && (
+                      {result.agencyAddress && (
                         <p className="flex items-start gap-1.5 text-xs text-gray-500">
                           <span className="shrink-0 text-gray-400">(사무실)</span>
-                          <span>{agencyAddress}</span>
+                          <span>{result.agencyAddress}</span>
                         </p>
                       )}
-
-                      {/* 이격 경고 — 200m 초과 시만 */}
                       {rec.distanceM > 200 && (
                         <p className="flex items-center gap-1.5 text-xs text-amber-600 font-medium">
                           <span>⚠️</span>
