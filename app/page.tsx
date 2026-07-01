@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
+import { isCoarsePointer } from '@/lib/device';
 
 const KakaoMap = dynamic(() => import('@/components/KakaoMap'), { ssr: false });
 
@@ -34,6 +35,11 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [pinAddress, setPinAddress] = useState<{ road: string; jibun: string } | null>(null);
+  const [isTouch, setIsTouch] = useState(false);
+
+  useEffect(() => {
+    setIsTouch(isCoarsePointer());
+  }, []);
 
   const search = useCallback(async (params: { query: string } | { lat: number; lng: number }) => {
     setLoading(true);
@@ -147,7 +153,9 @@ export default function Home() {
                     )}
                   </div>
                 ) : (
-                  <p className="text-gray-400">📍 핀을 드래그하면 위치를 보정할 수 있습니다</p>
+                  <p className="text-gray-400">
+                    {isTouch ? '📍 지도를 움직이면 위치를 보정할 수 있습니다' : '📍 핀을 드래그하면 위치를 보정할 수 있습니다'}
+                  </p>
                 )}
               </div>
             )}
@@ -233,7 +241,7 @@ export default function Home() {
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
                 <div className="bg-black/60 text-white text-xs px-3 py-1.5 rounded-full whitespace-nowrap backdrop-blur-sm flex items-center gap-1.5">
                   <span>📍</span>
-                  <span>핀 드래그 또는 우클릭으로 위치를 보정할 수 있습니다</span>
+                  <span>{isTouch ? '지도를 움직여 핀 위치를 조정하세요' : '핀 드래그 또는 우클릭으로 위치를 보정할 수 있습니다'}</span>
                 </div>
               </div>
             </>

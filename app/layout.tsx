@@ -20,8 +20,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         {kakaoKey && kakaoKey !== 'YOUR_KAKAO_JS_KEY' && (
           <script
+            id="kakao-map-sdk"
             type="text/javascript"
-            src={`//dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoKey}&libraries=services`}
+            src={`//dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoKey}&libraries=services&autoload=false`}
             async
           />
         )}
