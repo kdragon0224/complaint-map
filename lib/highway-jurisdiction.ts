@@ -231,6 +231,8 @@ const JURISDICTION_RULES: JurisdictionRule[] = [
   { etcCode: '0301', kmStart: 83.25,  kmEnd: 191.15,  hq: '대구경북본부', branch: '청송지사' },
 
   { etcCode: '0303', kmStart: 0.0,    kmEnd: 83.25,   hq: '충북본부',     branch: '보은지사' },
+  // 0303 코드로 찍히는 상주영덕 구간 (0301과 동일 도로, ETC 코드만 상이)
+  { etcCode: '0303', kmStart: 83.25,  kmEnd: 191.15,  hq: '대구경북본부', branch: '청송지사' },
 
   { etcCode: '0305', kmStart: 0.0,    kmEnd: 12.98,   hq: '대전충남본부', branch: '당진지사' },
   { etcCode: '0305', kmStart: 12.98,  kmEnd: 91.58,   hq: '대전충남본부', branch: '공주지사' },
@@ -422,6 +424,10 @@ const TRANSFERRED_SECTIONS: { etcCode: string; kmStart: number; kmEnd: number; a
   { etcCode: '0550', kmStart: 10.12, kmEnd: 108.58, agency: '신대구부산고속도로(주)' },
   // 경인고속도로 인천 기점~서인천: 2017년 일반화, 인천시 이관 (인천대로)
   { etcCode: '1200', kmStart: 0.0, kmEnd: 10.45, agency: '인천광역시 (인천대로 구간)' },
+  // 경인고속도로 신월~여의: 서울 구간 일반화 (국회대로), 지하는 민자 신월여의지하도로
+  { etcCode: '1200', kmStart: 23.89, kmEnd: 28.5, agency: '서울특별시 (국회대로 구간)' },
+  // 수도권제1순환선 퇴계원~일산: 민자 (직제 주석 기재)
+  { etcCode: '1000', kmStart: 33.55, kmEnd: 69.85, agency: '서울고속도로(주)' },
 ];
 
 /**
@@ -442,6 +448,17 @@ export function lookupJurisdiction(etcCode: string, km: number): { hq: string; b
       return { hq: rule.hq, branch: rule.branch };
     }
   }
+
+  // 경계 허용치: 규칙 시작·끝에서 ±1.5km 이내는 인접 규칙으로 흡수
+  // (ETC 좌표 반올림·노선 말단 오차로 규칙 범위를 살짝 벗어나는 포인트 처리)
+  let best: { rule: JurisdictionRule; gap: number } | null = null;
+  for (const rule of JURISDICTION_RULES) {
+    if (rule.etcCode !== etcCode) continue;
+    const gap = km < rule.kmStart ? rule.kmStart - km : km - rule.kmEnd;
+    if (gap <= 1.5 && (!best || gap < best.gap)) best = { rule, gap };
+  }
+  if (best) return { hq: best.rule.hq, branch: best.rule.branch };
+
   return null;
 }
 
