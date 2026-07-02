@@ -266,7 +266,15 @@ export function analyzeRoad(lat: number, lng: number): AnalysisResult {
     return { candidates: [], recommendation: null, altCandidates: [] };
   }
 
-  const top = all[0];
+  // 최근접 후보가 '관할 확인 필요'(직제 미기재)여도 비슷한 거리(+150m) 안에
+  // 관할이 확정된 후보가 있으면 그쪽을 추천 (중첩 노선 구간 처리: 예. 중부선↔경부선 대전 구간)
+  let top = all[0];
+  if (top.agencyFull.includes('관할 확인 필요')) {
+    const confident = all.find(
+      c => !c.agencyFull.includes('관할 확인 필요') && c.agencyFull !== '' && c.distanceM <= top.distanceM + 150,
+    );
+    if (confident) top = confident;
+  }
   const confidence = calcConfidence(top, all);
 
   return {
