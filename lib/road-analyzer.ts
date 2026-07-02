@@ -106,6 +106,32 @@ function loadHwNodes(): NodePoint[] {
   return _hwNodes!;
 }
 
+// ── 노선명 + 이정(km)으로 위치 조회 (직제 검증·내부 확인용) ─────────────
+
+export function findRoutePointByKm(
+  name: string,
+  km: number,
+): { lat: number; lng: number; routeName: string; km: number } | null {
+  const grid = loadHwGrid();
+  const norm = (s: string) => s.replace(/[\s~()\-·]/g, '');
+  const target = norm(name);
+  if (target.length < 2) return null;
+
+  let best: { p: HwPoint; diff: number } | null = null;
+  for (const pts of Object.values(grid)) {
+    for (const p of pts) {
+      const n = norm(p.n ?? '');
+      if (n.length < 2) continue; // 빈 노선명이 모든 검색어와 매칭되는 것 방지
+      if (!(n.includes(target) || target.includes(n))) continue;
+      const diff = Math.abs(p.k - km);
+      if (!best || diff < best.diff) best = { p, diff };
+    }
+  }
+  // 요청 km에서 10km 초과로 벗어나면 해당 이정이 없는 것으로 간주
+  if (!best || best.diff > 10) return null;
+  return { lat: best.p.a, lng: best.p.o, routeName: best.p.n, km: best.p.k };
+}
+
 // ── 고속도로 탐색 (직제 기반 — 현행 유지) ────────────────────────────────
 
 function findNearbyHighways(lat: number, lng: number): RoadCandidate[] {

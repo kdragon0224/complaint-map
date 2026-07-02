@@ -116,7 +116,7 @@ export default function Home() {
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                placeholder="주소 또는 IC·JC 명칭 입력"
+                placeholder="주소, IC·JC명 또는 노선명+이정 (예: 중부선 220)"
                 className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50"
               />
               <button

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { analyzeRoad } from '@/lib/road-analyzer';
+import { analyzeRoad, findRoutePointByKm } from '@/lib/road-analyzer';
 import {
   RegionInfo,
   resolveNationalRoad,
@@ -99,17 +99,30 @@ export async function GET(req: NextRequest) {
 
   if (query) {
     inputAddress = query;
-    if (!key) {
-      return NextResponse.json({ error: 'API 키 미설정' }, { status: 500 });
+
+    // "노선명 km" 검색 (예: "중부선 220", "경부선 350km") — 직제 검증·내부 확인용
+    const kmMatch = query.trim().match(/^(.+?)\s+([\d.]+)\s*(?:km|㎞)?$/i);
+    const routePoint = kmMatch
+      ? findRoutePointByKm(kmMatch[1], parseFloat(kmMatch[2]))
+      : null;
+
+    if (routePoint) {
+      lat = routePoint.lat;
+      lng = routePoint.lng;
+      placeName = `${routePoint.routeName} ${routePoint.km.toFixed(1)}km 지점`;
+    } else {
+      if (!key) {
+        return NextResponse.json({ error: 'API 키 미설정' }, { status: 500 });
+      }
+      const geo = await geocode(query, key);
+      if (!geo) {
+        return NextResponse.json({ error: '주소를 찾을 수 없습니다.' }, { status: 404 });
+      }
+      lat = geo.lat;
+      lng = geo.lng;
+      placeName = geo.placeName;
+      preRegion = geo.region ?? null;
     }
-    const geo = await geocode(query, key);
-    if (!geo) {
-      return NextResponse.json({ error: '주소를 찾을 수 없습니다.' }, { status: 404 });
-    }
-    lat = geo.lat;
-    lng = geo.lng;
-    placeName = geo.placeName;
-    preRegion = geo.region ?? null;
   } else if (latParam && lngParam) {
     lat = parseFloat(latParam);
     lng = parseFloat(lngParam);
