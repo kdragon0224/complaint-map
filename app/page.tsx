@@ -185,7 +185,9 @@ export default function Home() {
                     {/* 2줄: 노선 + 이정 */}
                     <p className="mt-1 text-base font-bold text-gray-900">
                       <span className={`text-xs px-1.5 py-0.5 rounded font-semibold mr-1.5 align-middle ${
-                        rec.roadType === '고속국도' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
+                        rec.roadType === '고속국도' ? 'bg-green-100 text-green-700'
+                        : rec.roadType === '지방도' ? 'bg-purple-100 text-purple-700'
+                        : 'bg-blue-100 text-blue-700'
                       }`}>
                         {rec.roadType}
                       </span>

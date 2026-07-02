@@ -2,8 +2,9 @@
  * 도로 분석 및 관리주체 추천 엔진 (서버 사이드 전용)
  *
  * 데이터 파일 키 약어 (압축 포맷):
- *   highway-grid.json:       r=routeNo, n=routeName, k=km, a=lat, o=lng
- *   national-road-grid.json: r=routeNo, g=agency,    f=agencyFull, a=lat, o=lng
+ *   highway-grid.json:         r=routeNo, n=routeName, k=km, a=lat, o=lng
+ *   national-road-grid.json:   r=routeNo, g=agency,    f=agencyFull, a=lat, o=lng
+ *   provincial-road-grid.json: r=노선번호(숫자), g=도 인덱스(PROVINCES), a=lat, o=lng
  */
 
 import fs from 'fs';
@@ -72,14 +73,23 @@ function neighborKeys(lat: number, lng: number): string[] {
 
 // ── 그리드 로더 (모듈 캐시 — 프로세스 재시작 전까지 유지) ─────────────
 
-type HwPoint  = { r: string; n: string; k: number; a: number; o: number };
-type NatPoint = { r: string; g: string; f: string; a: number; o: number };
-type HwGrid   = Record<string, HwPoint[]>;
-type NatGrid  = Record<string, NatPoint[]>;
+type HwPoint   = { r: string; n: string; k: number; a: number; o: number };
+type NatPoint  = { r: string; g: string; f: string; a: number; o: number };
+type ProvPoint = { r: number; g: number; a: number; o: number };
+type HwGrid    = Record<string, HwPoint[]>;
+type NatGrid   = Record<string, NatPoint[]>;
+type ProvGrid  = Record<string, ProvPoint[]>;
 type NodePoint = Record<string, string | number>;
+
+// 지방도 관리 광역시·도 (provincial-road-grid.json 의 g 인덱스와 대응)
+const PROVINCES = [
+  '관할 시·도', '경기도', '강원특별자치도', '충청북도', '충청남도',
+  '전북특별자치도', '전라남도', '경상북도', '경상남도', '제주특별자치도',
+];
 
 let _hwGrid:   HwGrid   | null = null;
 let _natGrid:  NatGrid  | null = null;
+let _provGrid: ProvGrid | null = null;
 let _hwNodes:  NodePoint[] | null = null;
 
 function loadHwGrid(): HwGrid {
@@ -90,6 +100,11 @@ function loadHwGrid(): HwGrid {
 function loadNatGrid(): NatGrid {
   if (!_natGrid) _natGrid = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'national-road-grid.json'), 'utf-8'));
   return _natGrid!;
+}
+
+function loadProvGrid(): ProvGrid {
+  if (!_provGrid) _provGrid = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'provincial-road-grid.json'), 'utf-8'));
+  return _provGrid!;
 }
 
 function loadHwNodes(): NodePoint[] {
@@ -174,6 +189,44 @@ function findNearbyNationalRoads(lat: number, lng: number): RoadCandidate[] {
   return results.sort((a, b) => a.distanceM - b.distanceM);
 }
 
+// ── 지방도 탐색 (고속도로·국도 모두 200m 초과 시에만 실행) ───────────────
+
+function findNearbyProvincialRoads(lat: number, lng: number): RoadCandidate[] {
+  const grid = loadProvGrid();
+  const keys = neighborKeys(lat, lng);
+  const results: RoadCandidate[] = [];
+  const seen = new Set<number>();
+  const best: Record<number, { dist: number; g: number }> = {};
+
+  for (const key of keys) {
+    for (const p of grid[key] ?? []) {
+      const dist = haversineM(lat, lng, p.a, p.o);
+      if (dist > SEARCH_RADIUS_M) continue;
+      if (!(p.r in best) || dist < best[p.r].dist) {
+        best[p.r] = { dist, g: p.g };
+      }
+    }
+  }
+
+  for (const [noStr, { dist, g }] of Object.entries(best)) {
+    const no = Number(noStr);
+    if (seen.has(no)) continue;
+    seen.add(no);
+    const routeName = no < 100 ? `국가지원지방도 ${no}호선` : `지방도 ${no}호선`;
+    const agency = PROVINCES[g] ?? '관할 시·도';
+    results.push({
+      type: '지방도',
+      routeNo: String(no),
+      routeName,
+      agency,
+      agencyFull: agency === '관할 시·도' ? '관할 시·도 (도로관리부서)' : `${agency} (도로관리부서)`,
+      distanceM: Math.round(dist),
+    });
+  }
+
+  return results.sort((a, b) => a.distanceM - b.distanceM);
+}
+
 // ── 신뢰도 계산 ──────────────────────────────────────────────────────────
 
 function calcConfidence(
@@ -191,11 +244,18 @@ function calcConfidence(
 export function analyzeRoad(lat: number, lng: number): AnalysisResult {
   const highways = findNearbyHighways(lat, lng);
 
-  // 가까운 고속도로가 있으면 국도 탐색 생략 (2.4MB 파싱 회피)
+  // 가까운 고속도로가 있으면 국도 탐색 생략 (JSON 파싱 회피)
   const skipNational = highways.length > 0 && highways[0].distanceM <= HIGHWAY_PRIORITY_THRESHOLD_M;
   const nationalRoads = skipNational ? [] : findNearbyNationalRoads(lat, lng);
 
-  const all = [...highways, ...nationalRoads].sort((a, b) => a.distanceM - b.distanceM);
+  // 고속도로·국도가 모두 멀 때만 지방도 탐색
+  const nearest = Math.min(
+    highways[0]?.distanceM ?? Infinity,
+    nationalRoads[0]?.distanceM ?? Infinity,
+  );
+  const provincialRoads = nearest <= HIGHWAY_PRIORITY_THRESHOLD_M ? [] : findNearbyProvincialRoads(lat, lng);
+
+  const all = [...highways, ...nationalRoads, ...provincialRoads].sort((a, b) => a.distanceM - b.distanceM);
 
   if (all.length === 0) {
     return { candidates: [], recommendation: null, altCandidates: [] };
