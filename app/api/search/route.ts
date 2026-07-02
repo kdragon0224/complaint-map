@@ -29,7 +29,7 @@ function highwayScore(doc: { place_name?: string; address_name?: string; categor
 async function geocode(
   query: string,
   key: string,
-): Promise<{ lat: number; lng: number; placeName?: string } | null> {
+): Promise<{ lat: number; lng: number; placeName?: string; region?: RegionInfo } | null> {
   const q = encodeURIComponent(query);
   const headers = { Authorization: `KakaoAK ${key}` };
 
@@ -42,7 +42,16 @@ async function geocode(
 
   const addrDoc = addrData.documents?.[0];
   if (addrDoc) {
-    return { lat: parseFloat(addrDoc.y), lng: parseFloat(addrDoc.x) };
+    // 주소 검색 응답에 행정구역이 포함되어 있어 별도 API 호출 불필요
+    const a = addrDoc.address ?? addrDoc.road_address;
+    const region: RegionInfo | undefined = a?.region_1depth_name
+      ? {
+          sido: a.region_1depth_name,
+          sigungu: a.region_2depth_name ?? '',
+          dong: a.region_3depth_name ?? '',
+        }
+      : undefined;
+    return { lat: parseFloat(addrDoc.y), lng: parseFloat(addrDoc.x), region };
   }
 
   const kwDocs: any[] = kwData.documents || [];
@@ -85,6 +94,7 @@ export async function GET(req: NextRequest) {
   let lng: number;
   let placeName: string | undefined;
   let inputAddress: string | null = null;
+  let preRegion: RegionInfo | null = null; // 지오코딩에서 얻은 행정구역 (재조회 방지)
 
   if (query) {
     inputAddress = query;
@@ -98,6 +108,7 @@ export async function GET(req: NextRequest) {
     lat = geo.lat;
     lng = geo.lng;
     placeName = geo.placeName;
+    preRegion = geo.region ?? null;
   } else if (latParam && lngParam) {
     lat = parseFloat(latParam);
     lng = parseFloat(lngParam);
@@ -135,7 +146,7 @@ export async function GET(req: NextRequest) {
     roadResult.candidates.some(c => c.type !== '고속국도' && !c.agencyFull);
 
   if (needsRegion && key) {
-    const region = await fetchRegion(lat, lng, key);
+    const region = preRegion ?? await fetchRegion(lat, lng, key);
     if (region) {
       for (const c of roadResult.candidates) {
         if (c.agencyFull) continue;
