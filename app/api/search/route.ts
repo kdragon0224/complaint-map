@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { analyzeRoad } from '@/lib/road-analyzer';
+import {
+  RegionInfo,
+  resolveNationalRoad,
+  resolveProvincialRoad,
+  resolveArterial,
+  resolveFallback,
+} from '@/lib/road-rules';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -43,6 +50,27 @@ async function geocode(
   const sorted = [...kwDocs].sort((a, b) => highwayScore(b) - highwayScore(a));
   const doc = sorted[0];
   return { lat: parseFloat(doc.y), lng: parseFloat(doc.x), placeName: doc.place_name };
+}
+
+/** 좌표 → 행정구역 (시도/시군구/동) — 도로법 규칙 판정용 */
+async function fetchRegion(lat: number, lng: number, key: string): Promise<RegionInfo | null> {
+  try {
+    const res = await fetch(
+      `https://dapi.kakao.com/v2/local/geo/coord2regioncode.json?x=${lng}&y=${lat}`,
+      { headers: { Authorization: `KakaoAK ${key}` } },
+    );
+    const data = await res.json();
+    // B(법정동) 우선, 없으면 H(행정동)
+    const doc = (data.documents ?? []).find((d: any) => d.region_type === 'B') ?? data.documents?.[0];
+    if (!doc) return null;
+    return {
+      sido: doc.region_1depth_name ?? '',
+      sigungu: doc.region_2depth_name ?? '',
+      dong: doc.region_3depth_name ?? '',
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function GET(req: NextRequest) {
@@ -96,6 +124,51 @@ export async function GET(req: NextRequest) {
         reason: `검색어가 고속도로 시설이므로 ${hw.distanceM}m 거리의 고속국도(${hw.routeName})를 우선 추천`,
         distanceM: hw.distanceM,
       };
+    }
+  }
+
+  // ── 관리주체 확정 (고속국도 외 — 도로법 규칙 엔진) ─────────────────
+  // 고속국도가 아니거나 결과가 없으면 행정구역을 조회해 규칙으로 판정
+  const needsRegion =
+    !roadResult.recommendation ||
+    roadResult.candidates.some(c => c.type !== '고속국도' && !c.agencyFull);
+
+  if (needsRegion && key) {
+    const region = await fetchRegion(lat, lng, key);
+    if (region) {
+      for (const c of roadResult.candidates) {
+        if (c.agencyFull) continue;
+        if (c.osmClass === 'n') {
+          c.agencyFull = resolveNationalRoad(region);
+        } else if (c.osmClass === 'p') {
+          c.agencyFull = resolveProvincialRoad(region);
+        } else if (c.osmClass === 'x') {
+          const r = resolveArterial(c.roadName ?? c.routeName, region);
+          c.agencyFull = r.agency;
+          if (r.isUrbanExpressway) c.type = '도시고속화도로';
+        }
+        c.agency = c.agencyFull;
+      }
+      // 추천도 갱신 (top 후보 기준)
+      const top = roadResult.candidates[0];
+      if (roadResult.recommendation && top && roadResult.recommendation.roadType !== '고속국도') {
+        roadResult.recommendation.agency = top.agency;
+        roadResult.recommendation.agencyFull = top.agencyFull;
+        roadResult.recommendation.roadType = top.type;
+        roadResult.recommendation.routeName = top.routeName;
+      }
+      // 인식된 도로가 없으면 시군구 폴백 — "정보 없음" 제거
+      if (!roadResult.recommendation) {
+        roadResult.recommendation = {
+          agency: resolveFallback(region),
+          agencyFull: resolveFallback(region),
+          roadType: '시군도',
+          routeName: `${region.sigungu} 관내 도로`,
+          confidence: '낮음',
+          reason: '주변 500m 내 인식된 간선도로가 없어 관할 지자체를 안내',
+          distanceM: 0,
+        };
+      }
     }
   }
 

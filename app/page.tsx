@@ -186,15 +186,20 @@ export default function Home() {
                     <p className="mt-1 text-base font-bold text-gray-900">
                       <span className={`text-xs px-1.5 py-0.5 rounded font-semibold mr-1.5 align-middle ${
                         rec.roadType === '고속국도' ? 'bg-green-100 text-green-700'
+                        : rec.roadType === '일반국도' ? 'bg-blue-100 text-blue-700'
                         : rec.roadType === '지방도' ? 'bg-purple-100 text-purple-700'
-                        : 'bg-blue-100 text-blue-700'
+                        : rec.roadType === '도시고속화도로' ? 'bg-orange-100 text-orange-700'
+                        : 'bg-gray-100 text-gray-600'
                       }`}>
                         {rec.roadType}
                       </span>
                       {rec.routeName.replace(/\s*\(.*?\)/, '')}
-                      {rec.routeName.match(/\(([^)]+)\)/) && (
-                        <span className="ml-1">{rec.routeName.match(/\(([^)]+)\)/)?.[1]} 지점</span>
-                      )}
+                      {(() => {
+                        const paren = rec.routeName.match(/\(([^)]+)\)/)?.[1];
+                        if (!paren) return null;
+                        // km 이정은 "지점", 도로명은 그대로 표시
+                        return <span className="ml-1">{paren.includes('km') ? `${paren} 지점` : paren}</span>;
+                      })()}
                     </p>
 
                     {/* 이격 경고 */}
