@@ -80,10 +80,29 @@ export async function GET(req: NextRequest) {
   }
 
   const roadResult = analyzeRoad(lat, lng);
+
+  // 검색어가 고속도로 시설(IC/JC/TG 등)이면 500m 내 고속국도 후보를 우선 추천
+  // (지오코딩 핀이 램프 인근에 찍혀 국도·지방도가 더 가까운 경우 보정)
+  const HW_FACILITY = /(IC|JC|JCT|TG|나들목|분기점|영업소|톨게이트|휴게소)\s*$/i;
+  if (query && HW_FACILITY.test(query.trim()) && roadResult.recommendation?.roadType !== '고속국도') {
+    const hw = roadResult.candidates.find(c => c.type === '고속국도');
+    if (hw) {
+      roadResult.recommendation = {
+        agency: hw.agency,
+        agencyFull: hw.agencyFull,
+        roadType: hw.type,
+        routeName: hw.routeName,
+        confidence: '보통',
+        reason: `검색어가 고속도로 시설이므로 ${hw.distanceM}m 거리의 고속국도(${hw.routeName})를 우선 추천`,
+        distanceM: hw.distanceM,
+      };
+    }
+  }
+
   const rec = roadResult.recommendation;
 
-  // 백그라운드 로그 저장
-  supabase.from('query_logs').insert({
+  // 백그라운드 로그 저장 (nolog=1 이면 생략 — 자동 테스트용)
+  if (!searchParams.get('nolog')) supabase.from('query_logs').insert({
     input_address: inputAddress,
     lat,
     lng,
