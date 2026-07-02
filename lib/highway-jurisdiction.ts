@@ -413,10 +413,15 @@ const JURISDICTION_RULES: JurisdictionRule[] = [
   { etcCode: '7000', kmStart: 0.0,    kmEnd: 38.71,   hq: '대구경북본부', branch: '대구지사' },
 ];
 
-// 도공 외 기관 이관 구간 (직제 범위 밖 특수 구간)
+// 도공 외 기관 이관·민자 구간 (직제 범위 밖 특수 구간)
+// ★ 원칙: 직제세부운영계획에 있는 구간만 도공 관리. 그 외는 이관·민자·불명으로 처리
 const TRANSFERRED_SECTIONS: { etcCode: string; kmStart: number; kmEnd: number; agency: string }[] = [
   // 경부고속도로 한남~양재: 2002년 서울시 이관 (경부간선도로)
   { etcCode: '0010', kmStart: 416.05, kmEnd: 426.0, agency: '서울특별시 (경부간선도로 구간)' },
+  // 중앙선 대구~부산 구간: 민자 (신대구부산고속도로)
+  { etcCode: '0550', kmStart: 10.12, kmEnd: 108.58, agency: '신대구부산고속도로(주)' },
+  // 경인고속도로 인천 기점~서인천: 2017년 일반화, 인천시 이관 (인천대로)
+  { etcCode: '1200', kmStart: 0.0, kmEnd: 10.45, agency: '인천광역시 (인천대로 구간)' },
 ];
 
 /**
@@ -453,6 +458,8 @@ export function formatAgency(etcCode: string, km: number, fallbackIcName?: strin
 
   const j = lookupJurisdiction(etcCode, km);
   if (j) return `한국도로공사 ${j.hq} ${j.branch}`;
-  if (fallbackIcName) return `한국도로공사 (${fallbackIcName} 인근)`;
-  return '한국도로공사';
+
+  // 직제 미기재 구간 — 도공 관할로 단정하지 않음 (민자·이관 가능성)
+  if (fallbackIcName) return `관할 확인 필요 (${fallbackIcName} 인근, 직제 미기재 구간)`;
+  return '관할 확인 필요 (직제 미기재 구간)';
 }
