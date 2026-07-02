@@ -6,6 +6,7 @@ import {
   resolveProvincialRoad,
   resolveArterial,
   resolveFallback,
+  resolvePrivateLocal,
 } from '@/lib/road-rules';
 import { createClient } from '@supabase/supabase-js';
 
@@ -138,7 +139,11 @@ export async function GET(req: NextRequest) {
     if (region) {
       for (const c of roadResult.candidates) {
         if (c.agencyFull) continue;
-        if (c.osmClass === 'n') {
+        // 민자 지방도·교량 (제3경인고속화도로 등) — 도로명 우선 매칭
+        const privateOp = c.roadName ? resolvePrivateLocal(c.roadName) : null;
+        if (privateOp) {
+          c.agencyFull = privateOp;
+        } else if (c.osmClass === 'n') {
           c.agencyFull = resolveNationalRoad(region);
         } else if (c.osmClass === 'p') {
           c.agencyFull = resolveProvincialRoad(region);
