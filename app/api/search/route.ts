@@ -7,6 +7,7 @@ import {
   resolveArterial,
   resolveFallback,
   resolvePrivateLocal,
+  normalizeSido,
 } from '@/lib/road-rules';
 import { createClient } from '@supabase/supabase-js';
 
@@ -46,7 +47,7 @@ async function geocode(
     const a = addrDoc.address ?? addrDoc.road_address;
     const region: RegionInfo | undefined = a?.region_1depth_name
       ? {
-          sido: a.region_1depth_name,
+          sido: normalizeSido(a.region_1depth_name),
           sigungu: a.region_2depth_name ?? '',
           dong: a.region_3depth_name ?? '',
         }
@@ -74,7 +75,7 @@ async function fetchRegion(lat: number, lng: number, key: string): Promise<Regio
     const doc = (data.documents ?? []).find((d: any) => d.region_type === 'B') ?? data.documents?.[0];
     if (!doc) return null;
     return {
-      sido: doc.region_1depth_name ?? '',
+      sido: normalizeSido(doc.region_1depth_name ?? ''),
       sigungu: doc.region_2depth_name ?? '',
       dong: doc.region_3depth_name ?? '',
     };

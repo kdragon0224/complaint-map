@@ -132,7 +132,12 @@ function findNearbyHighways(lat: number, lng: number): RoadCandidate[] {
     if (seen.has(pt.r)) continue;
     seen.add(pt.r);
 
-    const routeNodes = nodes.filter(n => n.routeNo === parseInt(pt.r).toString());
+    // ETC 4자리 코드 → 노드 routeNo 변환 (예: '0010'→'1', '0250'→'25', '1000'→'100')
+    // parseInt('0010')=10 이 남해선(10호선) 노드와 오매칭되는 버그 방지
+    const nodeRouteNo = pt.r.length === 4 && !pt.r.startsWith('9')
+      ? Math.floor(parseInt(pt.r) / 10).toString()
+      : parseInt(pt.r).toString();
+    const routeNodes = nodes.filter(n => n.routeNo === nodeRouteNo);
     const prevNode = routeNodes
       .filter(n => (n.km as number) <= pt.k)
       .sort((a, b) => (b.km as number) - (a.km as number))[0];

@@ -413,6 +413,12 @@ const JURISDICTION_RULES: JurisdictionRule[] = [
   { etcCode: '7000', kmStart: 0.0,    kmEnd: 38.71,   hq: '대구경북본부', branch: '대구지사' },
 ];
 
+// 도공 외 기관 이관 구간 (직제 범위 밖 특수 구간)
+const TRANSFERRED_SECTIONS: { etcCode: string; kmStart: number; kmEnd: number; agency: string }[] = [
+  // 경부고속도로 한남~양재: 2002년 서울시 이관 (경부간선도로)
+  { etcCode: '0010', kmStart: 416.05, kmEnd: 426.0, agency: '서울특별시 (경부간선도로 구간)' },
+];
+
 /**
  * 민자 고속도로 여부 확인 (ETC 4자리 코드 기준)
  */
@@ -440,6 +446,10 @@ export function lookupJurisdiction(etcCode: string, km: number): { hq: string; b
 export function formatAgency(etcCode: string, km: number, fallbackIcName?: string): string {
   const privateOp = getPrivateOperator(etcCode);
   if (privateOp) return privateOp;
+
+  // 타기관 이관 구간 (경부간선도로 등)
+  const t = TRANSFERRED_SECTIONS.find(s => s.etcCode === etcCode && km >= s.kmStart && km <= s.kmEnd);
+  if (t) return t.agency;
 
   const j = lookupJurisdiction(etcCode, km);
   if (j) return `한국도로공사 ${j.hq} ${j.branch}`;
