@@ -277,7 +277,7 @@ export default function Home() {
               <div>
                 <p className="text-gray-600 font-medium text-sm">민원 위치를 입력하세요</p>
                 <p className="text-gray-400 text-xs mt-1 leading-relaxed">
-                  주소 또는 IC·JC 이름으로 검색하면<br />담당 관리주체를 자동으로 추천합니다
+                  주소, IC·JC명 또는 노선명+이정으로 검색하면<br />담당 관리주체를 자동으로 추천합니다
                 </p>
               </div>
             </div>
