@@ -140,9 +140,14 @@ export default function StatsPage() {
           <img src="/ex-logo.png" alt="EX" style={{ height: '13px', width: 'auto' }} />
           <h1 className="font-bold" style={{ fontSize: '14.6px' }}>이용 현황 통계</h1>
         </div>
-        <Link href="/" className="bg-yellow-400 hover:bg-yellow-300 text-[#0d2d6b] text-xs font-bold px-3 py-1.5 rounded-full transition-colors">
-          ← 앱으로
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/admin" className="text-blue-300 text-xs hover:text-white transition-colors">
+            관리자 홈
+          </Link>
+          <Link href="/" className="bg-yellow-400 hover:bg-yellow-300 text-[#0d2d6b] text-xs font-bold px-3 py-1.5 rounded-full transition-colors">
+            ← 앱으로
+          </Link>
+        </div>
       </header>
 
       <div className="max-w-3xl w-full mx-auto p-4 flex flex-col gap-4">

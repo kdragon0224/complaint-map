@@ -129,8 +129,8 @@ export default function Home() {
             </h1>
           </div>
         </div>
-        <Link href={reportHref} className="bg-yellow-400 hover:bg-yellow-300 text-[#0d2d6b] text-xs font-bold px-3 py-1.5 rounded-full transition-colors shrink-0 whitespace-nowrap shadow-sm">
-          🚨 오류 신고하기
+        <Link href="/admin" className="bg-yellow-400 hover:bg-yellow-300 text-[#0d2d6b] text-xs font-bold px-3 py-1.5 rounded-full transition-colors shrink-0 whitespace-nowrap shadow-sm">
+          ⚙️ 관리자
         </Link>
       </header>
 

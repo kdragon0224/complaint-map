@@ -176,6 +176,9 @@ function FeedbackPageInner() {
               관리자
             </button>
           )}
+          <Link href="/admin" className="text-blue-300 text-xs hover:text-white transition-colors">
+            관리자 홈
+          </Link>
           <Link href="/" className="bg-yellow-400 hover:bg-yellow-300 text-[#0d2d6b] text-xs font-bold px-3 py-1.5 rounded-full transition-colors">
             ← 앱으로
           </Link>
