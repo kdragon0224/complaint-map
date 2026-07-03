@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { Suspense, useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { supabase, Post, Comment } from '@/lib/supabase';
 import Link from 'next/link';
 
@@ -16,7 +17,24 @@ function timeAgo(dateStr: string) {
   return `${Math.floor(h / 24)}일 전`;
 }
 
+interface ReportContext {
+  query?: string;
+  lat: number;
+  lng: number;
+  roadType: string;
+  routeName: string;
+  agency: string;
+}
+
 export default function FeedbackPage() {
+  return (
+    <Suspense fallback={null}>
+      <FeedbackPageInner />
+    </Suspense>
+  );
+}
+
+function FeedbackPageInner() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [showWrite, setShowWrite] = useState(false);
@@ -33,6 +51,29 @@ export default function FeedbackPage() {
   const [adminPw, setAdminPw] = useState('');
   const [adminError, setAdminError] = useState('');
 
+  // 검색 결과에서 자동 첨부된 신고 컨텍스트 (메인 페이지 "이 결과가 잘못됐나요?" 클릭 시)
+  const searchParams = useSearchParams();
+  const [reportCtx, setReportCtx] = useState<ReportContext | null>(null);
+
+  useEffect(() => {
+    const lat = searchParams.get('reportLat');
+    const lng = searchParams.get('reportLng');
+    const roadType = searchParams.get('reportRoadType');
+    const routeName = searchParams.get('reportRouteName');
+    const agency = searchParams.get('reportAgency');
+    if (lat && lng && roadType && routeName && agency) {
+      setReportCtx({
+        query: searchParams.get('reportQuery') ?? undefined,
+        lat: parseFloat(lat),
+        lng: parseFloat(lng),
+        roadType,
+        routeName,
+        agency,
+      });
+      setShowWrite(true);
+    }
+  }, [searchParams]);
+
   const fetchPosts = useCallback(async () => {
     const { data } = await supabase
       .from('posts')
@@ -47,10 +88,22 @@ export default function FeedbackPage() {
   const submitPost = async () => {
     if (!nickname.trim() || !content.trim()) return;
     setSubmitting(true);
-    await supabase.from('posts').insert({ nickname: nickname.trim(), content: content.trim() });
+    await supabase.from('posts').insert({
+      nickname: nickname.trim(),
+      content: content.trim(),
+      ...(reportCtx && {
+        report_query: reportCtx.query ?? null,
+        report_lat: reportCtx.lat,
+        report_lng: reportCtx.lng,
+        report_road_type: reportCtx.roadType,
+        report_route_name: reportCtx.routeName,
+        report_agency: reportCtx.agency,
+      }),
+    });
     setNickname('');
     setContent('');
     setShowWrite(false);
+    setReportCtx(null);
     setSubmitting(false);
     fetchPosts();
   };
@@ -169,6 +222,23 @@ export default function FeedbackPage() {
           </button>
         ) : (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col gap-3">
+            {reportCtx && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-xs text-gray-700 flex flex-col gap-1">
+                <div className="flex items-center justify-between">
+                  <p className="font-semibold text-amber-700">📍 신고 대상 검색 정보 (자동 첨부됨)</p>
+                  <button
+                    onClick={() => setReportCtx(null)}
+                    className="text-gray-400 hover:text-gray-600 text-xs shrink-0"
+                  >
+                    첨부 해제
+                  </button>
+                </div>
+                {reportCtx.query && <p>· 검색어: <span className="font-medium">{reportCtx.query}</span></p>}
+                <p>· 좌표: {reportCtx.lat.toFixed(5)}, {reportCtx.lng.toFixed(5)}</p>
+                <p>· 판정: {reportCtx.roadType} {reportCtx.routeName}</p>
+                <p>· 기관: {reportCtx.agency}</p>
+              </div>
+            )}
             <input
               value={nickname}
               onChange={e => setNickname(e.target.value)}
@@ -232,6 +302,24 @@ export default function FeedbackPage() {
                   )}
                 </div>
                 <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{post.content}</p>
+
+                {post.report_lat != null && post.report_lng != null && (
+                  <div className="mt-3 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-xs text-gray-600 flex flex-col gap-1">
+                    <p className="font-semibold text-gray-500">📍 신고된 검색 정보</p>
+                    {post.report_query && <p>· 검색어: {post.report_query}</p>}
+                    <p>· 좌표: {post.report_lat.toFixed(5)}, {post.report_lng.toFixed(5)}</p>
+                    {post.report_road_type && <p>· 판정: {post.report_road_type} {post.report_route_name}</p>}
+                    {post.report_agency && <p>· 기관: {post.report_agency}</p>}
+                    <a
+                      href={`/?lat=${post.report_lat}&lng=${post.report_lng}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline font-medium mt-1 inline-block w-fit"
+                    >
+                      🗺️ 지도에서 위치 확인 →
+                    </a>
+                  </div>
+                )}
               </div>
 
               <div className="px-4 pb-3 flex items-center gap-4 border-t border-gray-50 pt-3">

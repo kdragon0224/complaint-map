@@ -12,6 +12,12 @@ export interface Post {
   likes: number;
   created_at: string;
   comments?: Comment[];
+  report_query?: string | null;
+  report_lat?: number | null;
+  report_lng?: number | null;
+  report_road_type?: string | null;
+  report_route_name?: string | null;
+  report_agency?: string | null;
 }
 
 export interface Comment {

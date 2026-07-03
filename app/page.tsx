@@ -36,6 +36,7 @@ export default function Home() {
   const [error, setError] = useState('');
   const [pinAddress, setPinAddress] = useState<{ road: string; jibun: string } | null>(null);
   const [isTouch, setIsTouch] = useState(false);
+  const [lastQuery, setLastQuery] = useState<string | null>(null);
 
   useEffect(() => {
     setIsTouch(isCoarsePointer());
@@ -56,6 +57,7 @@ export default function Home() {
       }
       const data: SearchResult = await res.json();
       setResult(data);
+      setLastQuery('query' in params ? params.query : null);
       if ('query' in params) {
         setPinLat(data.lat);
         setPinLng(data.lng);
@@ -67,6 +69,23 @@ export default function Home() {
       setLoading(false);
     }
   }, []);
+
+  // 오류 신고 게시판의 "지도에서 위치 확인" 링크(?lat=&lng=)로 진입 시 해당 위치 표시
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const lat = params.get('lat');
+    const lng = params.get('lng');
+    if (lat && lng) {
+      const la = parseFloat(lat);
+      const lo = parseFloat(lng);
+      if (!isNaN(la) && !isNaN(lo)) {
+        setPinLat(la);
+        setPinLng(lo);
+        setShowMap(true);
+        search({ lat: la, lng: lo });
+      }
+    }
+  }, [search]);
 
   const handleSearch = () => {
     if (!address.trim()) return;
@@ -81,6 +100,19 @@ export default function Home() {
 
   const rec = result?.recommendation;
   const isPrivate = rec && !rec.agencyFull.startsWith('한국도로공사');
+
+  const reportHref = (() => {
+    if (!result || !rec) return '/feedback';
+    const params = new URLSearchParams({
+      reportLat: String(result.lat),
+      reportLng: String(result.lng),
+      reportRoadType: rec.roadType,
+      reportRouteName: rec.routeName,
+      reportAgency: rec.agencyFull,
+    });
+    if (lastQuery) params.set('reportQuery', lastQuery);
+    return `/feedback?${params.toString()}`;
+  })();
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
@@ -97,7 +129,7 @@ export default function Home() {
             </h1>
           </div>
         </div>
-        <Link href="/feedback" className="bg-yellow-400 hover:bg-yellow-300 text-[#0d2d6b] text-xs font-bold px-3 py-1.5 rounded-full transition-colors shrink-0 whitespace-nowrap shadow-sm">
+        <Link href={reportHref} className="bg-yellow-400 hover:bg-yellow-300 text-[#0d2d6b] text-xs font-bold px-3 py-1.5 rounded-full transition-colors shrink-0 whitespace-nowrap shadow-sm">
           🚨 오류 신고하기
         </Link>
       </header>
@@ -215,12 +247,24 @@ export default function Home() {
                       </p>
                     )}
                   </div>
+                  <Link
+                    href={reportHref}
+                    className="block text-center py-2 text-xs font-semibold text-gray-500 hover:text-red-500 hover:bg-red-50 border-t border-black/5 transition-colors"
+                  >
+                    ⚠️ 이 결과가 잘못됐나요?
+                  </Link>
                 </div>
               ) : (
                 <div className="flex-1 flex flex-col items-center justify-center gap-3 py-8 text-center">
                   <div className="text-4xl">🔍</div>
                   <p className="text-gray-500 text-sm font-medium">주변 500m 내 도로 정보 없음</p>
                   <p className="text-gray-400 text-xs">핀을 이동하거나 주소를 재검색해 주세요</p>
+                  <Link
+                    href={reportHref}
+                    className="text-xs font-semibold text-gray-500 hover:text-red-500 underline"
+                  >
+                    ⚠️ 이 위치의 정보를 신고하기
+                  </Link>
                 </div>
               )}
             </div>
