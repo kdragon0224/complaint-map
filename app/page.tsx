@@ -101,6 +101,7 @@ export default function Home() {
   const handlePinMove = useCallback((lat: number, lng: number) => {
     setPinLat(lat);
     setPinLng(lng);
+    setAddress(''); // 핀 이동 시 이전 검색어를 지워 "핀 위치 기준"임을 명확히 함
     search({ lat, lng });
   }, [search]);
 
