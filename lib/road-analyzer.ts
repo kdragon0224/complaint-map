@@ -13,7 +13,8 @@
 
 import fs from 'fs';
 import path from 'path';
-import { formatAgency } from './highway-jurisdiction';
+import { formatAgency, lookupJurisdiction } from './highway-jurisdiction';
+import { getBranchContacts, BranchContact } from './branch-contacts';
 
 const DATA_DIR = path.join(process.cwd(), 'public', 'data');
 const GRID_SIZE = 0.1;
@@ -34,6 +35,7 @@ export interface RoadCandidate {
   km?: number;
   osmClass?: 'n' | 'p' | 'x';
   roadName?: string;   // OSM 도로명 (표시 보조)
+  contacts?: BranchContact[]; // 전북본부 지사만 채워짐 (검증된 본부만 노출)
 }
 
 export interface AnalysisResult {
@@ -46,6 +48,7 @@ export interface AnalysisResult {
     confidence: '높음' | '보통' | '낮음';
     reason: string;
     distanceM: number;
+    contacts?: BranchContact[];
   } | null;
   altCandidates: RoadCandidate[];
 }
@@ -170,6 +173,8 @@ function findNearbyHighways(lat: number, lng: number): RoadCandidate[] {
 
     const fallbackIc = prevNode ? String(prevNode.name) : undefined;
     const agency = formatAgency(pt.r, pt.k, fallbackIc);
+    const jurisdiction = lookupJurisdiction(pt.r, pt.k);
+    const contacts = jurisdiction ? getBranchContacts(jurisdiction.branch) ?? undefined : undefined;
 
     results.push({
       type: '고속국도',
@@ -179,6 +184,7 @@ function findNearbyHighways(lat: number, lng: number): RoadCandidate[] {
       agencyFull: agency,
       distanceM: Math.round(pt.dist),
       km: pt.k,
+      contacts,
     });
   }
 
@@ -287,6 +293,7 @@ export function analyzeRoad(lat: number, lng: number): AnalysisResult {
       confidence,
       reason: `민원 위치에서 ${top.distanceM}m 거리의 ${top.type}(${top.routeName})을 기준으로 추천`,
       distanceM: top.distanceM,
+      contacts: top.contacts,
     },
     altCandidates: all.slice(1, 3),
   };

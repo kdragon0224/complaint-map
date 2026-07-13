@@ -7,6 +7,11 @@ import { isCoarsePointer } from '@/lib/device';
 
 const KakaoMap = dynamic(() => import('@/components/KakaoMap'), { ssr: false });
 
+interface BranchContact {
+  label: string;
+  phone: string;
+}
+
 interface Recommendation {
   agency: string;
   agencyFull: string;
@@ -15,6 +20,7 @@ interface Recommendation {
   confidence: '높음' | '보통' | '낮음';
   reason: string;
   distanceM: number;
+  contacts?: BranchContact[];
 }
 
 interface SearchResult {
@@ -245,6 +251,22 @@ export default function Home() {
                             : `${Math.round(rec.distanceM)}m`} 떨어져 있습니다
                         </span>
                       </p>
+                    )}
+
+                    {/* 담당 연락처 (전북본부 지사만 노출) */}
+                    {rec.contacts && rec.contacts.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-black/10 flex flex-col gap-1.5">
+                        {rec.contacts.map((c) => (
+                          <a
+                            key={c.label}
+                            href={`tel:${c.phone}`}
+                            className="flex items-center justify-between rounded-lg bg-white/70 hover:bg-white px-2.5 py-1.5 text-xs transition-colors"
+                          >
+                            <span className="font-semibold text-gray-700">{c.label}</span>
+                            <span className="font-semibold text-blue-700">{c.phone}</span>
+                          </a>
+                        ))}
+                      </div>
                     )}
                   </div>
                   <Link
