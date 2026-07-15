@@ -99,6 +99,12 @@ export default function KakaoMap({ lat, lng, onPinMove, onAddressChange }: Props
             if (idleTimerRef.current) { clearTimeout(idleTimerRef.current); idleTimerRef.current = null; }
             if (pinRef.current) pinRef.current.style.transform = 'translate(-50%, -100%) translateY(-8px)';
           });
+          // 연속된 터치 안에서 잠깐 멈췄다 다시 움직이면 dragstart가 재발생하지 않을 수 있음
+          // → 패닝 중 계속 발생하는 drag 이벤트에서도 대기 중인 확정 타이머를 취소해
+          //   "멈칫했던 시점"의 좌표가 실수로 확정되지 않게 함
+          kakao.maps.event.addListener(mapRef.current, 'drag', () => {
+            if (idleTimerRef.current) { clearTimeout(idleTimerRef.current); idleTimerRef.current = null; }
+          });
           kakao.maps.event.addListener(mapRef.current, 'idle', () => {
             if (!draggingRef.current) return;
             if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
