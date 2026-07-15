@@ -63,7 +63,7 @@ export default function KakaoMap({ lat, lng, onPinMove, onAddressChange }: Props
   const markerRef = useRef<any>(null);
   const touchInitRef = useRef(false);
   const draggingRef = useRef(false);
-  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchActiveRef = useRef(false);
   const onPinMoveRef = useRef(onPinMove);
   const onAddressChangeRef = useRef(onAddressChange);
   onPinMoveRef.current = onPinMove;
@@ -90,34 +90,28 @@ export default function KakaoMap({ lat, lng, onPinMove, onAddressChange }: Props
 
         if (touchMode) {
           // 모바일: 지도를 움직여 중앙 고정핀으로 위치 지정
-          // dragend/idle의 발생 순서를 신뢰할 수 없어(기기별로 idle이 dragend보다 먼저 오기도 함),
-          // "idle이 일정 시간(디바운스) 동안 재발생하지 않으면 최종 위치로 확정"하는 방식으로 처리.
-          // 드래그 도중 잠깐 멈칫해 idle이 떠도 곧 다시 움직이면 타이머가 취소되어 스냅백이 없고,
-          // 진짜로 멈추면 디바운스 시간 뒤에 좌표가 확정되어 검색이 반드시 실행된다.
+          // 카카오의 dragstart/dragend/idle 순서는 신뢰할 수 없음 — 연속된 터치 중 잠깐
+          // 멈칫하면 손가락이 안 떨어졌는데도 내부적으로 드래그가 "끝난" 것처럼 이벤트가 뜨기도 함.
+          // → 카카오 이벤트 대신 실제 브라우저 touchstart/touchend로 손가락이 화면에
+          //   닿아있는지 직접 추적하고, "손을 뗀 뒤에 뜨는 idle"만 최종 위치로 확정한다.
+          containerRef.current.addEventListener('touchstart', () => { touchActiveRef.current = true; }, { passive: true });
+          containerRef.current.addEventListener('touchend', () => { touchActiveRef.current = false; }, { passive: true });
+          containerRef.current.addEventListener('touchcancel', () => { touchActiveRef.current = false; }, { passive: true });
+
           kakao.maps.event.addListener(mapRef.current, 'dragstart', () => {
             draggingRef.current = true;
-            if (idleTimerRef.current) { clearTimeout(idleTimerRef.current); idleTimerRef.current = null; }
             if (pinRef.current) pinRef.current.style.transform = 'translate(-50%, -100%) translateY(-8px)';
-          });
-          // 연속된 터치 안에서 잠깐 멈췄다 다시 움직이면 dragstart가 재발생하지 않을 수 있음
-          // → 패닝 중 계속 발생하는 drag 이벤트에서도 대기 중인 확정 타이머를 취소해
-          //   "멈칫했던 시점"의 좌표가 실수로 확정되지 않게 함
-          kakao.maps.event.addListener(mapRef.current, 'drag', () => {
-            if (idleTimerRef.current) { clearTimeout(idleTimerRef.current); idleTimerRef.current = null; }
           });
           kakao.maps.event.addListener(mapRef.current, 'idle', () => {
             if (!draggingRef.current) return;
-            if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-            idleTimerRef.current = setTimeout(() => {
-              idleTimerRef.current = null;
-              draggingRef.current = false;
-              if (pinRef.current) pinRef.current.style.transform = 'translate(-50%, -100%)';
-              const c = mapRef.current.getCenter();
-              onPinMoveRef.current?.(c.getLat(), c.getLng());
-              reverseGeocode(kakao, c.getLat(), c.getLng(), (addr) => {
-                onAddressChangeRef.current?.(addr);
-              });
-            }, 350);
+            if (touchActiveRef.current) return; // 아직 손가락이 화면에 닿아있음 — 최종 위치 아님
+            draggingRef.current = false;
+            if (pinRef.current) pinRef.current.style.transform = 'translate(-50%, -100%)';
+            const c = mapRef.current.getCenter();
+            onPinMoveRef.current?.(c.getLat(), c.getLng());
+            reverseGeocode(kakao, c.getLat(), c.getLng(), (addr) => {
+              onAddressChangeRef.current?.(addr);
+            });
           });
         } else {
           // PC: 우클릭으로 핀 이동
