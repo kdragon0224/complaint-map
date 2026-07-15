@@ -157,7 +157,7 @@ export default function StatsPage() {
         </div>
       </header>
 
-      <div className="max-w-3xl w-full mx-auto p-4 flex flex-col gap-4">
+      <div className={`${tab === 'logs' ? 'max-w-6xl' : 'max-w-3xl'} w-full mx-auto p-4 flex flex-col gap-4`}>
         {/* 탭 */}
         <div className="flex gap-2">
           {(['overview', 'logs'] as const).map(t => (
@@ -259,155 +259,158 @@ export default function StatsPage() {
             </div>
           </>
         ) : (
-          /* 조회 기록 테이블 */
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="p-3 border-b border-gray-50">
-              <p className="text-sm font-semibold text-gray-700">최근 조회 기록 (최대 500건)</p>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="bg-gray-50 text-gray-500">
-                    <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">조회 시간</th>
-                    <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">입력 주소</th>
-                    <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">결과 기관</th>
-                    <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">노선</th>
-                    <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">이격</th>
-                    <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">신뢰도</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {logs.map((l, i) => (
-                    <tr
-                      key={l.id}
-                      onClick={() => setSelectedLog(l)}
-                      className={`cursor-pointer hover:bg-blue-50 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
-                    >
-                      <td className="px-3 py-2 whitespace-nowrap text-gray-500">{formatDate(l.queried_at)}</td>
-                      <td className="px-3 py-2 max-w-[120px] truncate text-gray-700">{l.input_address || '-'}</td>
-                      <td className={`px-3 py-2 max-w-[140px] truncate ${l.found ? 'text-gray-700' : 'text-red-400'}`}>
-                        {l.result_agency_full || '결과 없음'}
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-gray-500">{l.result_route_name || '-'}</td>
-                      <td className="px-3 py-2 whitespace-nowrap text-gray-500">
-                        {l.result_distance_m != null
-                          ? l.result_distance_m >= 1000
-                            ? `${(l.result_distance_m / 1000).toFixed(1)}km`
-                            : `${Math.round(l.result_distance_m)}m`
-                          : '-'}
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap">
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                          l.confidence === '높음' ? 'bg-emerald-100 text-emerald-700'
-                          : l.confidence === '보통' ? 'bg-amber-100 text-amber-700'
-                          : l.confidence === '낮음' ? 'bg-red-100 text-red-600'
-                          : 'bg-gray-100 text-gray-400'
-                        }`}>
-                          {l.confidence || '-'}
-                        </span>
-                      </td>
+          /* 조회 기록: 좌측 목록 / 우측 상세 (PC 2단 레이아웃) */
+          <div className="flex gap-4 items-start">
+            {/* 좌측: 목록 */}
+            <div className="flex-1 min-w-0 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="p-3 border-b border-gray-50">
+                <p className="text-sm font-semibold text-gray-700">최근 조회 기록 (최대 500건)</p>
+              </div>
+              <div className="overflow-x-auto max-h-[75vh] overflow-y-auto">
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0">
+                    <tr className="bg-gray-50 text-gray-500">
+                      <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">조회 시간</th>
+                      <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">입력 주소</th>
+                      <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">결과 기관</th>
+                      <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">노선</th>
+                      <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">이격</th>
+                      <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">신뢰도</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-              {logs.length === 0 && (
-                <p className="text-center text-gray-400 text-sm py-10">아직 조회 기록이 없습니다</p>
+                  </thead>
+                  <tbody>
+                    {logs.map((l, i) => (
+                      <tr
+                        key={l.id}
+                        onClick={() => setSelectedLog(l)}
+                        className={`cursor-pointer hover:bg-blue-50 transition-colors ${
+                          selectedLog?.id === l.id ? 'bg-blue-50' : i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
+                        }`}
+                      >
+                        <td className="px-3 py-2 whitespace-nowrap text-gray-500">{formatDate(l.queried_at)}</td>
+                        <td className={`px-3 py-2 max-w-[120px] truncate ${l.input_address ? 'text-gray-700' : 'text-gray-400 italic'}`}>
+                          {l.input_address || '핀 이동'}
+                        </td>
+                        <td className={`px-3 py-2 max-w-[140px] truncate ${l.found ? 'text-gray-700' : 'text-red-400'}`}>
+                          {l.result_agency_full || '결과 없음'}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap text-gray-500">{l.result_route_name || '-'}</td>
+                        <td className="px-3 py-2 whitespace-nowrap text-gray-500">
+                          {l.result_distance_m != null
+                            ? l.result_distance_m >= 1000
+                              ? `${(l.result_distance_m / 1000).toFixed(1)}km`
+                              : `${Math.round(l.result_distance_m)}m`
+                            : '-'}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                            l.confidence === '높음' ? 'bg-emerald-100 text-emerald-700'
+                            : l.confidence === '보통' ? 'bg-amber-100 text-amber-700'
+                            : l.confidence === '낮음' ? 'bg-red-100 text-red-600'
+                            : 'bg-gray-100 text-gray-400'
+                          }`}>
+                            {l.confidence || '-'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {logs.length === 0 && (
+                  <p className="text-center text-gray-400 text-sm py-10">아직 조회 기록이 없습니다</p>
+                )}
+              </div>
+            </div>
+
+            {/* 우측: 선택한 기록의 당시 결과 화면 */}
+            <div className="w-[360px] shrink-0 sticky top-4 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              {!selectedLog ? (
+                <div className="h-[400px] flex items-center justify-center p-6">
+                  <p className="text-sm text-gray-400 text-center">왼쪽에서 조회 기록을 선택하면<br />당시 결과 화면이 여기에 표시됩니다</p>
+                </div>
+              ) : (
+                <>
+                  <div className="px-4 py-3 border-b border-gray-100">
+                    <p className="text-sm font-bold text-gray-800">조회 당시 결과 화면</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">{formatDate(selectedLog.queried_at)}</p>
+                    <p className="text-xs mt-1">
+                      <span className="text-gray-400">입력값: </span>
+                      <span className={selectedLog.input_address ? 'text-gray-700 font-medium' : 'text-gray-400 italic'}>
+                        {selectedLog.input_address || '핀 이동'}
+                      </span>
+                    </p>
+                  </div>
+
+                  {selectedLog.lat != null && selectedLog.lng != null && (
+                    <div className="relative h-56 shrink-0">
+                      <KakaoMap lat={selectedLog.lat} lng={selectedLog.lng} />
+                    </div>
+                  )}
+
+                  <div className="p-4">
+                    {selectedLog.found && selectedLog.result_agency_full ? (
+                      <div className={`rounded-2xl overflow-hidden shadow-sm border ${
+                        !selectedLog.result_agency_full.startsWith('한국도로공사') ? 'border-amber-200' : 'border-blue-100'
+                      }`}>
+                        <div className={`p-4 ${
+                          !selectedLog.result_agency_full.startsWith('한국도로공사') ? 'bg-amber-50' : 'bg-gradient-to-br from-blue-50 to-indigo-50'
+                        }`}>
+                          <p className="text-base font-bold text-gray-900 leading-snug">{selectedLog.result_agency_full}</p>
+                          <p className="mt-1 text-base font-bold text-gray-900">
+                            {selectedLog.result_road_type && (
+                              <span className={`text-xs px-1.5 py-0.5 rounded font-semibold mr-1.5 align-middle ${
+                                selectedLog.result_road_type === '고속국도' ? 'bg-green-100 text-green-700'
+                                : selectedLog.result_road_type === '일반국도' ? 'bg-blue-100 text-blue-700'
+                                : selectedLog.result_road_type === '지방도' ? 'bg-purple-100 text-purple-700'
+                                : selectedLog.result_road_type === '도시고속화도로' ? 'bg-orange-100 text-orange-700'
+                                : 'bg-gray-100 text-gray-600'
+                              }`}>
+                                {selectedLog.result_road_type}
+                              </span>
+                            )}
+                            {selectedLog.result_route_name?.replace(/\s*\(.*?\)/, '') || '-'}
+                            {(() => {
+                              const paren = selectedLog.result_route_name?.match(/\(([^)]+)\)/)?.[1];
+                              if (!paren) return null;
+                              return <span className="ml-1">{paren.includes('km') ? `${paren} 지점` : paren}</span>;
+                            })()}
+                          </p>
+
+                          {selectedLog.result_distance_m != null && selectedLog.result_distance_m > 200 && (
+                            <p className="mt-3 pt-3 border-t border-black/10 flex items-center gap-1.5 text-xs text-amber-600 font-medium">
+                              <span>⚠️</span>
+                              <span>
+                                핀이 관리노선에서{' '}
+                                {selectedLog.result_distance_m >= 1000
+                                  ? `${(selectedLog.result_distance_m / 1000).toFixed(1)}km`
+                                  : `${Math.round(selectedLog.result_distance_m)}m`} 떨어져 있습니다
+                              </span>
+                            </p>
+                          )}
+
+                          <div className="mt-3 pt-3 border-t border-black/10 flex items-center justify-between text-xs">
+                            <span className="text-gray-500">신뢰도</span>
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                              selectedLog.confidence === '높음' ? 'bg-emerald-100 text-emerald-700'
+                              : selectedLog.confidence === '보통' ? 'bg-amber-100 text-amber-700'
+                              : selectedLog.confidence === '낮음' ? 'bg-red-100 text-red-600'
+                              : 'bg-gray-100 text-gray-400'
+                            }`}>
+                              {selectedLog.confidence || '-'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-center text-gray-400 text-sm py-6">당시 결과 없음</p>
+                    )}
+                  </div>
+                </>
               )}
             </div>
           </div>
         )}
       </div>
-
-      {/* 당시 이용자 화면 재현 모달 */}
-      {selectedLog && (
-        <div
-          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-          onClick={() => setSelectedLog(null)}
-        >
-          <div
-            className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden max-h-[90vh] flex flex-col"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between shrink-0">
-              <div>
-                <p className="text-sm font-bold text-gray-800">조회 당시 결과 화면</p>
-                <p className="text-[11px] text-gray-400">{formatDate(selectedLog.queried_at)} · {selectedLog.input_address || '핀 이동으로 조회'}</p>
-              </div>
-              <button
-                onClick={() => setSelectedLog(null)}
-                className="text-gray-400 hover:text-gray-600 text-xl leading-none px-1"
-              >
-                ×
-              </button>
-            </div>
-
-            {selectedLog.lat != null && selectedLog.lng != null && (
-              <div className="relative h-56 shrink-0">
-                <KakaoMap lat={selectedLog.lat} lng={selectedLog.lng} />
-              </div>
-            )}
-
-            <div className="p-4 overflow-y-auto">
-              {selectedLog.found && selectedLog.result_agency_full ? (
-                <div className={`rounded-2xl overflow-hidden shadow-sm border ${
-                  !selectedLog.result_agency_full.startsWith('한국도로공사') ? 'border-amber-200' : 'border-blue-100'
-                }`}>
-                  <div className={`p-4 ${
-                    !selectedLog.result_agency_full.startsWith('한국도로공사') ? 'bg-amber-50' : 'bg-gradient-to-br from-blue-50 to-indigo-50'
-                  }`}>
-                    <p className="text-base font-bold text-gray-900 leading-snug">{selectedLog.result_agency_full}</p>
-                    <p className="mt-1 text-base font-bold text-gray-900">
-                      {selectedLog.result_road_type && (
-                        <span className={`text-xs px-1.5 py-0.5 rounded font-semibold mr-1.5 align-middle ${
-                          selectedLog.result_road_type === '고속국도' ? 'bg-green-100 text-green-700'
-                          : selectedLog.result_road_type === '일반국도' ? 'bg-blue-100 text-blue-700'
-                          : selectedLog.result_road_type === '지방도' ? 'bg-purple-100 text-purple-700'
-                          : selectedLog.result_road_type === '도시고속화도로' ? 'bg-orange-100 text-orange-700'
-                          : 'bg-gray-100 text-gray-600'
-                        }`}>
-                          {selectedLog.result_road_type}
-                        </span>
-                      )}
-                      {selectedLog.result_route_name?.replace(/\s*\(.*?\)/, '') || '-'}
-                      {(() => {
-                        const paren = selectedLog.result_route_name?.match(/\(([^)]+)\)/)?.[1];
-                        if (!paren) return null;
-                        return <span className="ml-1">{paren.includes('km') ? `${paren} 지점` : paren}</span>;
-                      })()}
-                    </p>
-
-                    {selectedLog.result_distance_m != null && selectedLog.result_distance_m > 200 && (
-                      <p className="mt-3 pt-3 border-t border-black/10 flex items-center gap-1.5 text-xs text-amber-600 font-medium">
-                        <span>⚠️</span>
-                        <span>
-                          핀이 관리노선에서{' '}
-                          {selectedLog.result_distance_m >= 1000
-                            ? `${(selectedLog.result_distance_m / 1000).toFixed(1)}km`
-                            : `${Math.round(selectedLog.result_distance_m)}m`} 떨어져 있습니다
-                        </span>
-                      </p>
-                    )}
-
-                    <div className="mt-3 pt-3 border-t border-black/10 flex items-center justify-between text-xs">
-                      <span className="text-gray-500">신뢰도</span>
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
-                        selectedLog.confidence === '높음' ? 'bg-emerald-100 text-emerald-700'
-                        : selectedLog.confidence === '보통' ? 'bg-amber-100 text-amber-700'
-                        : selectedLog.confidence === '낮음' ? 'bg-red-100 text-red-600'
-                        : 'bg-gray-100 text-gray-400'
-                      }`}>
-                        {selectedLog.confidence || '-'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-center text-gray-400 text-sm py-6">당시 결과 없음</p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
