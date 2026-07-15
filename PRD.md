@@ -1,6 +1,6 @@
 # PRD — 도로 관리기관 확인 시스템
 > Product Requirements Document (기술 레퍼런스)  
-> 작성: 한국도로공사 전북본부 | 최초 작성: 2026년 6월 | 최종 수정: 2026년 7월 (직제 원문 대조·오류신고 자동첨부·관리자 허브 반영)
+> 작성: 한국도로공사 전북본부 | 최초 작성: 2026년 6월 | 최종 수정: 2026년 7월 15일 (지사 연락처·조회기록 상세보기·동일지번 다중후보 선택 반영)
 
 ---
 
@@ -27,6 +27,8 @@
 [지오코딩] Kakao 주소검색 + 키워드검색 병렬
   · 주소 결과 → 좌표 + 행정구역까지 응답에 포함 (별도 API 호출 생략)
   · 키워드 결과 → 고속도로 시설(IC·JC·SA) 우선 정렬
+  · 주소 결과에 서로 다른 시/도가 섞여 있으면(동명 지번) 자동 선택 대신
+    { ambiguous: candidates[] } 응답 → 클라이언트가 후보 목록 UI 표시 (§15)
     ↓
 핀 좌표 확정
     ↓
@@ -70,9 +72,11 @@
 | `lat`, `lng` | 좌표 직접 지정 (핀 이동 시) |
 | `nolog=1` | 이용 로그 저장 생략 (자동 테스트용) |
 
-응답: `{ lat, lng, placeName?, candidates[], recommendation, altCandidates[] }`
+응답: `{ lat, lng, placeName?, candidates[], recommendation, altCandidates[] }`  
+동명 지번(다중 시/도) 감지 시: `{ ambiguous: [{ label, lat, lng }] }` (§15 참고, `recommendation` 없음)
 
 - `recommendation.roadType`: 고속국도 / 일반국도 / 지방도 / 도시고속화도로 / 시군도
+- `recommendation.contacts?`: 전북본부 6개 지사 관할일 때만 포함 (§7-1)
 - 실측 응답 시간: 좌표 31~48ms, 주소 검색 40~48ms
 
 ---
@@ -174,6 +178,21 @@ osm-road-grid: { c: 'n'|'p'|'x', r: 노선번호(0=없음), n: 도로명, a: lat
 | 위치 보정 (모바일) | **중앙 고정핀** — 지도를 움직여 지정, `pointer: coarse`로 자동 감지, `?touch=1`로 강제 |
 | 도로유형 배지 | 고속국도(녹) 일반국도(청) 지방도(보라) 도시고속화도로(주황) 시군도(회색) |
 | 이격 경고 | 200m 초과 시만 표시 |
+| 핀 이동 시 검색어 초기화 | `handlePinMove`에서 `setAddress('')` — 이전 검색어가 남아 새 핀 위치와 불일치해 보이는 혼동 방지 |
+
+### 7-1. 지사 연락처 (`lib/branch-contacts.ts`)
+
+`getBranchContacts(branch: string): BranchContact[] | null` — 정적 조회, 외부 API 의존 없음.
+현재 **전주·부안·무주·논산·진안·보령지사 6곳만** 등록되어 있고, 그 외 모든 지사는 `null`을 반환해
+결과 카드에 연락처 블록 자체가 렌더링되지 않는다 (`lib/road-analyzer.ts`의 `findNearbyHighways()`에서
+`lookupJurisdiction()` 결과의 `branch`로 조회 → `RoadCandidate.contacts`에 실어 전달).
+
+```
+톨게이트·휴게소   내선 850-XXXX / 외부 063-714-XXXX
+교통사고·도로포장  내선 850-XXXX / 외부 063-714-XXXX (뒤 4자리 동일)
+```
+
+타 본부로 확대할 때는 해당 본부 연락처를 검증 후 `BRANCH_CONTACTS`에 항목만 추가하면 된다.
 
 ---
 
@@ -290,7 +309,39 @@ RLS 정책: anon SELECT·INSERT 허용 (게시판·로그 모두 로그인 불�
 
 ---
 
-## 14. 데이터 갱신 가이드
+## 14. 이용 현황 통계 — 조회 기록 상세보기 (`/stats`, `조회 기록` 탭)
+
+PC 전용 좌측 목록 / 우측 상세 2단 레이아웃. 목록 행 클릭 시 `query_logs`에 **당시 저장된 값 그대로**로
+지도+결과카드를 재구성해 우측 패널에 표시한다 (좌표로 재조회하지 않음 — 코드가 그 사이 바뀌면 현재 결과와
+달라질 수 있으므로, "그때 사용자가 실제로 본 값"을 보존해서 보여주는 것이 목적).
+
+- 지도: `KakaoMap`에 로그의 `lat`/`lng`를 그대로 전달. `absolute inset-0`로 렌더링되므로
+  **부모 컨테이너에 반드시 `relative` + 명시적 높이**가 있어야 함 (없으면 모달/패널 전체를 뒤덮는 버그 발생 — 실제로 겪은 이슈)
+- 결과 카드: 메인 화면(`app/page.tsx`)의 결과 카드와 동일한 스타일(배지 색상, 이격 경고, 신뢰도 배지)을 재사용해
+  "이용자 화면 그대로"라는 요구사항 충족
+- 입력값 표시: `input_address`가 `null`인 로그(핀 이동으로 조회된 경우)는 목록·상세 패널 모두 **"핀 이동"**으로 표시 (이탤릭 회색)
+- `reason`(판정 근거 문구)은 로그에 저장하지 않음 — 모니터링 목적에는 기관/노선/거리/신뢰도로 충분하다고 판단
+
+## 15. 동일 지번 다중 후보 처리
+
+`app/api/search/route.ts`의 `geocode()`가 카카오 주소 검색 응답(`documents[]`)에서
+**서로 다른 `region_1depth_name`(시/도)가 2개 이상** 섞여 있는지 검사한다.
+
+```ts
+const distinctSido = new Set(addrDocs.map(d => (d.address ?? d.road_address)?.region_1depth_name));
+if (distinctSido.size > 1) {
+  return { ambiguous: addrDocs.map(d => ({ label, lat, lng })) };
+}
+```
+
+- 모호할 때는 `analyzeRoad()`를 호출하지 않고 즉시 `{ ambiguous: [...] }`를 응답 (불필요한 판정 연산 생략)
+- 클라이언트(`app/page.tsx`)는 결과 카드 자리에 후보 선택 목록을 렌더링, 사용자가 고르면
+  기존에 지원하던 `?lat=&lng=` 경로(`search({ lat, lng })`)로 재호출 — 별도 API 없이 기존 좌표 검색 경로 재사용
+- 시/도가 하나로만 잡히는 절대다수의 검색은 기존과 동일하게 추가 왕복 없이 바로 결과가 나옴
+
+---
+
+## 16. 데이터 갱신 가이드
 
 ### 직제 개편 시 (연 1회)
 1. 새 hwpx를 zip으로 압축 해제 → `Contents/section*.xml`에서 `<hp:t>` 텍스트 추출해 원문 표 복원
