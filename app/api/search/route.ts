@@ -27,10 +27,20 @@ function highwayScore(doc: { place_name?: string; address_name?: string; categor
   return HIGHWAY_KEYWORDS.some(kw => name.includes(kw.toUpperCase()) || cat.includes(kw.toUpperCase())) ? 1 : 0;
 }
 
+interface GeocodeCandidate {
+  label: string;
+  lat: number;
+  lng: number;
+}
+
 async function geocode(
   query: string,
   key: string,
-): Promise<{ lat: number; lng: number; placeName?: string; region?: RegionInfo } | null> {
+): Promise<
+  | { lat: number; lng: number; placeName?: string; region?: RegionInfo }
+  | { ambiguous: GeocodeCandidate[] }
+  | null
+> {
   const q = encodeURIComponent(query);
   const headers = { Authorization: `KakaoAK ${key}` };
 
@@ -41,7 +51,23 @@ async function geocode(
       .then(r => r.json()).catch(() => ({ documents: [] })),
   ]);
 
-  const addrDoc = addrData.documents?.[0];
+  const addrDocs: any[] = addrData.documents || [];
+
+  // 동일 지번이 서로 다른 시/도에 존재 — 자동으로 하나를 고르지 않고 선택지를 제시
+  const distinctSido = new Set(
+    addrDocs.map(d => (d.address ?? d.road_address)?.region_1depth_name).filter(Boolean),
+  );
+  if (distinctSido.size > 1) {
+    return {
+      ambiguous: addrDocs.map(d => ({
+        label: (d.road_address ?? d.address)?.address_name || d.address_name,
+        lat: parseFloat(d.y),
+        lng: parseFloat(d.x),
+      })),
+    };
+  }
+
+  const addrDoc = addrDocs[0];
   if (addrDoc) {
     // 주소 검색 응답에 행정구역이 포함되어 있어 별도 API 호출 불필요
     const a = addrDoc.address ?? addrDoc.road_address;
@@ -117,6 +143,9 @@ export async function GET(req: NextRequest) {
       const geo = await geocode(query, key);
       if (!geo) {
         return NextResponse.json({ error: '주소를 찾을 수 없습니다.' }, { status: 404 });
+      }
+      if ('ambiguous' in geo) {
+        return NextResponse.json({ ambiguous: geo.ambiguous });
       }
       lat = geo.lat;
       lng = geo.lng;

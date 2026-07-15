@@ -29,6 +29,12 @@ interface SearchResult {
   recommendation: Recommendation | null;
 }
 
+interface GeocodeCandidate {
+  label: string;
+  lat: number;
+  lng: number;
+}
+
 const DEFAULT_LAT = 37.5665;
 const DEFAULT_LNG = 126.9784;
 
@@ -43,6 +49,7 @@ export default function Home() {
   const [pinAddress, setPinAddress] = useState<{ road: string; jibun: string } | null>(null);
   const [isTouch, setIsTouch] = useState(false);
   const [lastQuery, setLastQuery] = useState<string | null>(null);
+  const [candidates, setCandidates] = useState<GeocodeCandidate[] | null>(null);
 
   useEffect(() => {
     setIsTouch(isCoarsePointer());
@@ -51,6 +58,7 @@ export default function Home() {
   const search = useCallback(async (params: { query: string } | { lat: number; lng: number }) => {
     setLoading(true);
     setError('');
+    setCandidates(null);
     try {
       const qs = 'query' in params
         ? `query=${encodeURIComponent(params.query)}`
@@ -61,7 +69,12 @@ export default function Home() {
         setError(data.error || '주소를 찾을 수 없습니다.');
         return;
       }
-      const data: SearchResult = await res.json();
+      const data: SearchResult & { ambiguous?: GeocodeCandidate[] } = await res.json();
+      if (data.ambiguous) {
+        setCandidates(data.ambiguous);
+        setResult(null);
+        return;
+      }
       setResult(data);
       setLastQuery('query' in params ? params.query : null);
       if ('query' in params) {
@@ -75,6 +88,15 @@ export default function Home() {
       setLoading(false);
     }
   }, []);
+
+  const selectCandidate = useCallback((c: GeocodeCandidate) => {
+    setCandidates(null);
+    setLastQuery(null);
+    search({ lat: c.lat, lng: c.lng });
+    setPinLat(c.lat);
+    setPinLng(c.lng);
+    setShowMap(true);
+  }, [search]);
 
   // 오류 신고 게시판의 "지도에서 위치 확인" 링크(?lat=&lng=)로 진입 시 해당 위치 표시
   useEffect(() => {
@@ -205,6 +227,36 @@ export default function Home() {
             <div className="flex-1 flex flex-col items-center justify-center gap-3 py-10">
               <div className="w-10 h-10 border-4 border-blue-100 border-t-[#0d2d6b] rounded-full animate-spin" />
               <p className="text-sm text-gray-400">도로 정보 분석 중...</p>
+            </div>
+          )}
+
+          {/* 동일 지번 다중 후보 선택 */}
+          {candidates && !loading && (
+            <div className="flex-1 flex flex-col p-4">
+              <div className="rounded-2xl overflow-hidden shadow-sm border border-amber-200">
+                <div className="p-3 bg-amber-50 border-b border-amber-100">
+                  <p className="text-sm font-bold text-gray-800">⚠️ 동일한 지번이 여러 곳에 있어요</p>
+                  <p className="text-xs text-gray-500 mt-0.5">찾으시는 위치를 선택해주세요</p>
+                </div>
+                <div className="divide-y divide-gray-100">
+                  {candidates.map((c, i) => {
+                    const sido = c.label.split(' ')[0];
+                    const rest = c.label.slice(sido.length).trim();
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => selectCandidate(c)}
+                        className="w-full text-left px-4 py-3 hover:bg-blue-50 transition-colors flex items-start gap-2"
+                      >
+                        <span className="shrink-0 mt-0.5">📍</span>
+                        <span className="text-sm text-gray-700">
+                          <span className="font-bold text-gray-900">{sido}</span> {rest}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           )}
 
