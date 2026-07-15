@@ -63,6 +63,7 @@ export default function KakaoMap({ lat, lng, onPinMove, onAddressChange }: Props
   const markerRef = useRef<any>(null);
   const touchInitRef = useRef(false);
   const draggingRef = useRef(false);
+  const dragEndedRef = useRef(false);
   const onPinMoveRef = useRef(onPinMove);
   const onAddressChangeRef = useRef(onAddressChange);
   onPinMoveRef.current = onPinMove;
@@ -89,15 +90,22 @@ export default function KakaoMap({ lat, lng, onPinMove, onAddressChange }: Props
 
         if (touchMode) {
           // 모바일: 지도를 움직여 중앙 고정핀으로 위치 지정
-          // dragend는 손을 뗀 시점이라 관성(모멘텀) 스크롤이 끝나기 전이라 좌표가 미묘하게 어긋날 수 있음
-          // → 모든 움직임이 완전히 멈춘 idle 시점에 최종 좌표를 캡처
+          // idle은 드래그 도중 손가락이 잠깐 멈칫할 때도 발생할 수 있어(아직 손을 떼지 않았는데도)
+          // 그 시점 좌표만으로 확정하면, 이후 계속된 드래그가 검색 완료 시 강제로 되돌려져
+          // "지도가 뒤로 홱 스냅백"하는 부자연스러운 현상이 생김
+          // → dragend(손을 뗀 시점) 이후에 발생한 idle만 최종 위치로 인정
           kakao.maps.event.addListener(mapRef.current, 'dragstart', () => {
             draggingRef.current = true;
+            dragEndedRef.current = false;
             if (pinRef.current) pinRef.current.style.transform = 'translate(-50%, -100%) translateY(-8px)';
           });
+          kakao.maps.event.addListener(mapRef.current, 'dragend', () => {
+            dragEndedRef.current = true;
+          });
           kakao.maps.event.addListener(mapRef.current, 'idle', () => {
-            if (!draggingRef.current) return;
+            if (!draggingRef.current || !dragEndedRef.current) return;
             draggingRef.current = false;
+            dragEndedRef.current = false;
             if (pinRef.current) pinRef.current.style.transform = 'translate(-50%, -100%)';
             const c = mapRef.current.getCenter();
             onPinMoveRef.current?.(c.getLat(), c.getLng());
