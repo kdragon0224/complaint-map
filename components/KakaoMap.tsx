@@ -63,7 +63,7 @@ export default function KakaoMap({ lat, lng, onPinMove, onAddressChange }: Props
   const markerRef = useRef<any>(null);
   const touchInitRef = useRef(false);
   const draggingRef = useRef(false);
-  const dragEndedRef = useRef(false);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onPinMoveRef = useRef(onPinMove);
   const onAddressChangeRef = useRef(onAddressChange);
   onPinMoveRef.current = onPinMove;
@@ -90,28 +90,28 @@ export default function KakaoMap({ lat, lng, onPinMove, onAddressChange }: Props
 
         if (touchMode) {
           // 모바일: 지도를 움직여 중앙 고정핀으로 위치 지정
-          // idle은 드래그 도중 손가락이 잠깐 멈칫할 때도 발생할 수 있어(아직 손을 떼지 않았는데도)
-          // 그 시점 좌표만으로 확정하면, 이후 계속된 드래그가 검색 완료 시 강제로 되돌려져
-          // "지도가 뒤로 홱 스냅백"하는 부자연스러운 현상이 생김
-          // → dragend(손을 뗀 시점) 이후에 발생한 idle만 최종 위치로 인정
+          // dragend/idle의 발생 순서를 신뢰할 수 없어(기기별로 idle이 dragend보다 먼저 오기도 함),
+          // "idle이 일정 시간(디바운스) 동안 재발생하지 않으면 최종 위치로 확정"하는 방식으로 처리.
+          // 드래그 도중 잠깐 멈칫해 idle이 떠도 곧 다시 움직이면 타이머가 취소되어 스냅백이 없고,
+          // 진짜로 멈추면 디바운스 시간 뒤에 좌표가 확정되어 검색이 반드시 실행된다.
           kakao.maps.event.addListener(mapRef.current, 'dragstart', () => {
             draggingRef.current = true;
-            dragEndedRef.current = false;
+            if (idleTimerRef.current) { clearTimeout(idleTimerRef.current); idleTimerRef.current = null; }
             if (pinRef.current) pinRef.current.style.transform = 'translate(-50%, -100%) translateY(-8px)';
           });
-          kakao.maps.event.addListener(mapRef.current, 'dragend', () => {
-            dragEndedRef.current = true;
-          });
           kakao.maps.event.addListener(mapRef.current, 'idle', () => {
-            if (!draggingRef.current || !dragEndedRef.current) return;
-            draggingRef.current = false;
-            dragEndedRef.current = false;
-            if (pinRef.current) pinRef.current.style.transform = 'translate(-50%, -100%)';
-            const c = mapRef.current.getCenter();
-            onPinMoveRef.current?.(c.getLat(), c.getLng());
-            reverseGeocode(kakao, c.getLat(), c.getLng(), (addr) => {
-              onAddressChangeRef.current?.(addr);
-            });
+            if (!draggingRef.current) return;
+            if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+            idleTimerRef.current = setTimeout(() => {
+              idleTimerRef.current = null;
+              draggingRef.current = false;
+              if (pinRef.current) pinRef.current.style.transform = 'translate(-50%, -100%)';
+              const c = mapRef.current.getCenter();
+              onPinMoveRef.current?.(c.getLat(), c.getLng());
+              reverseGeocode(kakao, c.getLat(), c.getLng(), (addr) => {
+                onAddressChangeRef.current?.(addr);
+              });
+            }, 350);
           });
         } else {
           // PC: 우클릭으로 핀 이동
