@@ -62,6 +62,7 @@ export default function KakaoMap({ lat, lng, onPinMove, onAddressChange }: Props
   const mapRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
   const touchInitRef = useRef(false);
+  const draggingRef = useRef(false);
   const onPinMoveRef = useRef(onPinMove);
   const onAddressChangeRef = useRef(onAddressChange);
   onPinMoveRef.current = onPinMove;
@@ -88,10 +89,15 @@ export default function KakaoMap({ lat, lng, onPinMove, onAddressChange }: Props
 
         if (touchMode) {
           // 모바일: 지도를 움직여 중앙 고정핀으로 위치 지정
+          // dragend는 손을 뗀 시점이라 관성(모멘텀) 스크롤이 끝나기 전이라 좌표가 미묘하게 어긋날 수 있음
+          // → 모든 움직임이 완전히 멈춘 idle 시점에 최종 좌표를 캡처
           kakao.maps.event.addListener(mapRef.current, 'dragstart', () => {
+            draggingRef.current = true;
             if (pinRef.current) pinRef.current.style.transform = 'translate(-50%, -100%) translateY(-8px)';
           });
-          kakao.maps.event.addListener(mapRef.current, 'dragend', () => {
+          kakao.maps.event.addListener(mapRef.current, 'idle', () => {
+            if (!draggingRef.current) return;
+            draggingRef.current = false;
             if (pinRef.current) pinRef.current.style.transform = 'translate(-50%, -100%)';
             const c = mapRef.current.getCenter();
             onPinMoveRef.current?.(c.getLat(), c.getLng());
