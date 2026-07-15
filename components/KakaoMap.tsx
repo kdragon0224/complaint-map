@@ -100,13 +100,11 @@ export default function KakaoMap({ lat, lng, onPinMove, onAddressChange }: Props
 
           kakao.maps.event.addListener(mapRef.current, 'dragstart', () => {
             draggingRef.current = true;
-            if (pinRef.current) pinRef.current.style.transform = 'translate(-50%, -100%) translateY(-8px)';
           });
           kakao.maps.event.addListener(mapRef.current, 'idle', () => {
             if (!draggingRef.current) return;
             if (touchActiveRef.current) return; // 아직 손가락이 화면에 닿아있음 — 최종 위치 아님
             draggingRef.current = false;
-            if (pinRef.current) pinRef.current.style.transform = 'translate(-50%, -100%)';
             const c = mapRef.current.getCenter();
             onPinMoveRef.current?.(c.getLat(), c.getLng());
             reverseGeocode(kakao, c.getLat(), c.getLng(), (addr) => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { isCoarsePointer } from '@/lib/device';
@@ -50,12 +50,17 @@ export default function Home() {
   const [isTouch, setIsTouch] = useState(false);
   const [lastQuery, setLastQuery] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<GeocodeCandidate[] | null>(null);
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
     setIsTouch(isCoarsePointer());
   }, []);
 
   const search = useCallback(async (params: { query: string } | { lat: number; lng: number }) => {
+    // 핀을 여러 번 옮기면 매번 새 요청이 나가는데, 네트워크 지연으로 이전 요청 응답이
+    // 나중에 도착하면 최신 결과를 오래된 결과로 덮어써버릴 수 있음
+    // → 요청마다 순번을 매겨, 가장 마지막에 보낸 요청의 응답만 반영
+    const reqId = ++requestIdRef.current;
     setLoading(true);
     setError('');
     setCandidates(null);
@@ -64,12 +69,14 @@ export default function Home() {
         ? `query=${encodeURIComponent(params.query)}`
         : `lat=${params.lat}&lng=${params.lng}`;
       const res = await fetch(`/api/search?${qs}`);
+      if (reqId !== requestIdRef.current) return; // 그 사이 더 최신 요청이 나감 — 이 응답은 폐기
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         setError(data.error || '주소를 찾을 수 없습니다.');
         return;
       }
       const data: SearchResult & { ambiguous?: GeocodeCandidate[] } = await res.json();
+      if (reqId !== requestIdRef.current) return;
       if (data.ambiguous) {
         setCandidates(data.ambiguous);
         setResult(null);
@@ -83,9 +90,10 @@ export default function Home() {
         setShowMap(true);
       }
     } catch {
+      if (reqId !== requestIdRef.current) return;
       setError('검색 중 오류가 발생했습니다.');
     } finally {
-      setLoading(false);
+      if (reqId === requestIdRef.current) setLoading(false);
     }
   }, []);
 
