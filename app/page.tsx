@@ -174,7 +174,7 @@ export default function Home() {
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden" style={{ height: 'calc(100vh - 56px)' }}>
 
         {/* 좌측 패널 */}
-        <div className="w-full lg:w-[380px] shrink-0 flex flex-col bg-white shadow-md z-10 overflow-y-auto order-2 lg:order-1 max-h-[45vh] lg:max-h-full">
+        <div className="w-full lg:w-[380px] shrink-0 flex flex-col bg-white shadow-md z-10 overflow-y-auto order-2 lg:order-1 h-[45vh] lg:h-auto lg:max-h-full">
 
           {/* 검색 */}
           <div className="p-4 border-b border-gray-100">
