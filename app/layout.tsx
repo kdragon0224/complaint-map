@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "민원위치 확인시스템",
+  title: "민원배부 내비게이션",
   description: "민원 위치를 입력하면 담당 도로 관리기관(한국도로공사 지사 또는 민자도로 운영사)과 연락처를 자동으로 안내합니다.",
   openGraph: {
-    title: "민원위치 확인시스템",
+    title: "민원배부 내비게이션",
     description: "민원 위치를 입력하면 담당 도로 관리기관과 연락처를 자동으로 안내합니다.",
     siteName: "한국도로공사 전북본부",
     locale: "ko_KR",
