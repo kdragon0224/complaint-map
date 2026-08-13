@@ -35,14 +35,15 @@ interface GeocodeCandidate {
   lng: number;
 }
 
-const DEFAULT_LAT = 37.5665;
-const DEFAULT_LNG = 126.9784;
+// 한국도로공사 전북본부 (전주시 덕진구 번영로 420)
+const DEFAULT_LAT = 35.8738772526154;
+const DEFAULT_LNG = 127.05213812858;
 
 export default function Home() {
   const [address, setAddress] = useState('');
   const [pinLat, setPinLat] = useState(DEFAULT_LAT);
   const [pinLng, setPinLng] = useState(DEFAULT_LNG);
-  const [showMap, setShowMap] = useState(false);
+  const [showMap, setShowMap] = useState(true);
   const [result, setResult] = useState<SearchResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -353,8 +354,8 @@ export default function Home() {
             </div>
           )}
 
-          {/* 초기 상태 */}
-          {!showMap && !loading && (
+          {/* 초기 상태 (지도는 이미 떠 있지만 아직 검색 전) */}
+          {!result && !candidates && !loading && (
             <div className="flex-1 flex flex-col items-center justify-center gap-4 py-10 text-center px-6">
               <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center text-3xl">🗺️</div>
               <div>
