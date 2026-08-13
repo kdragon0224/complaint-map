@@ -382,7 +382,7 @@ export default function StatsPage() {
                             })()}
                           </p>
 
-                          {selectedLog.result_distance_m != null && selectedLog.result_distance_m > 200 && (
+                          {selectedLog.result_distance_m != null && selectedLog.result_distance_m > 100 && (
                             <p className="mt-3 pt-3 border-t border-black/10 flex items-center gap-1.5 text-xs text-amber-600 font-medium">
                               <span>⚠️</span>
                               <span>
