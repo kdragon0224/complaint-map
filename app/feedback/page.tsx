@@ -41,7 +41,6 @@ function FeedbackPageInner() {
   const [nickname, setNickname] = useState('');
   const [content, setContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [expandedPost, setExpandedPost] = useState<number | null>(null);
   const [comments, setComments] = useState<Record<number, Comment[]>>({});
   const [commentInputs, setCommentInputs] = useState<Record<number, { nick: string; text: string }>>({});
 
@@ -81,6 +80,17 @@ function FeedbackPageInner() {
       .order('created_at', { ascending: false });
     setPosts(data || []);
     setLoading(false);
+
+    // 댓글은 클릭 없이 항상 보이므로, 게시글과 함께 전체 댓글을 한 번에 불러온다
+    const { data: allComments } = await supabase
+      .from('comments')
+      .select('*')
+      .order('created_at');
+    const byPost: Record<number, Comment[]> = {};
+    for (const c of allComments || []) {
+      (byPost[c.post_id] ??= []).push(c);
+    }
+    setComments(byPost);
   }, []);
 
   useEffect(() => { fetchPosts(); }, [fetchPosts]);
@@ -123,15 +133,6 @@ function FeedbackPageInner() {
     if (!confirm('이 댓글을 삭제하시겠습니까?')) return;
     await supabase.from('comments').delete().eq('id', commentId);
     setComments(prev => ({ ...prev, [postId]: prev[postId].filter(c => c.id !== commentId) }));
-  };
-
-  const toggleComments = async (postId: number) => {
-    if (expandedPost === postId) { setExpandedPost(null); return; }
-    setExpandedPost(postId);
-    if (!comments[postId]) {
-      const { data } = await supabase.from('comments').select('*').eq('post_id', postId).order('created_at');
-      setComments(prev => ({ ...prev, [postId]: data || [] }));
-    }
   };
 
   const submitComment = async (postId: number) => {
@@ -329,13 +330,12 @@ function FeedbackPageInner() {
                 <button onClick={() => toggleLike(post)} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-red-500 transition-colors">
                   <span>❤️</span><span>{post.likes}</span>
                 </button>
-                <button onClick={() => toggleComments(post.id)} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-blue-500 transition-colors">
-                  <span>💬</span><span>댓글 {expandedPost === post.id ? '▲' : '▼'}</span>
-                </button>
+                <span className="flex items-center gap-1.5 text-sm text-gray-500">
+                  <span>💬</span><span>댓글 {(comments[post.id] || []).length}</span>
+                </span>
               </div>
 
-              {expandedPost === post.id && (
-                <div className="border-t border-gray-100 bg-gray-50 p-4 flex flex-col gap-3">
+              <div className="border-t border-gray-100 bg-gray-50 p-4 flex flex-col gap-3">
                   {(comments[post.id] || []).map(c => (
                     <div key={c.id} className="flex gap-2 items-start">
                       <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-bold text-xs shrink-0">
@@ -381,7 +381,6 @@ function FeedbackPageInner() {
                     </button>
                   </div>
                 </div>
-              )}
             </div>
           ))
         )}
