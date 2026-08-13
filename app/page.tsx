@@ -161,7 +161,7 @@ export default function Home() {
           <img src="/ex-logo.png" alt="EX" style={{ height: '13px', width: 'auto', flexShrink: 0 }} />
           <div>
             <h1 className="font-bold leading-tight tracking-tight" style={{ fontSize: '14.6px' }}>
-              <span className="whitespace-nowrap">민원알림 내비게이션</span>{' '}
+              <span className="whitespace-nowrap">AI 민원배부 내비게이션</span>{' '}
               <span className="text-blue-200 font-normal whitespace-nowrap" style={{ fontSize: '11px' }}>(한국도로공사 전북본부 제작)</span>
             </h1>
           </div>
