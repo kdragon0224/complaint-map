@@ -84,6 +84,28 @@ async function geocode(
   const kwDocs: any[] = kwData.documents || [];
   if (kwDocs.length === 0) return null;
 
+  // 동일한 이름(예: "장수IC")이 서로 다른 시/도에 동시에 존재 — 자동으로 하나를 고르지 않고 선택지를 제시
+  const highwayDocs = kwDocs.filter(d => highwayScore(d) === 1);
+  const byName = new Map<string, any[]>();
+  for (const d of highwayDocs) {
+    const norm = (d.place_name || '').trim().toLowerCase();
+    if (!norm) continue;
+    if (!byName.has(norm)) byName.set(norm, []);
+    byName.get(norm)!.push(d);
+  }
+  for (const docs of byName.values()) {
+    const sidos = new Set(docs.map(d => (d.address_name || '').split(' ')[0]).filter(Boolean));
+    if (sidos.size > 1) {
+      return {
+        ambiguous: docs.map(d => ({
+          label: `${d.address_name || d.place_name} (${d.place_name})`,
+          lat: parseFloat(d.y),
+          lng: parseFloat(d.x),
+        })),
+      };
+    }
+  }
+
   const sorted = [...kwDocs].sort((a, b) => highwayScore(b) - highwayScore(a));
   const doc = sorted[0];
   return { lat: parseFloat(doc.y), lng: parseFloat(doc.x), placeName: doc.place_name };
