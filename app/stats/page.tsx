@@ -39,18 +39,22 @@ export default function StatsPage() {
   const [pw, setPw] = useState('');
   const [pwError, setPwError] = useState('');
   const [logs, setLogs] = useState<Log[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [foundCount, setFoundCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<'overview' | 'logs'>('overview');
   const [selectedLog, setSelectedLog] = useState<Log | null>(null);
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from('query_logs')
-      .select('*')
-      .order('queried_at', { ascending: false })
-      .limit(500);
+    const [{ data }, { count: total }, { count: found }] = await Promise.all([
+      supabase.from('query_logs').select('*').order('queried_at', { ascending: false }).limit(500),
+      supabase.from('query_logs').select('*', { count: 'exact', head: true }),
+      supabase.from('query_logs').select('*', { count: 'exact', head: true }).eq('found', true),
+    ]);
     setLogs(data || []);
+    setTotalCount(total ?? 0);
+    setFoundCount(found ?? 0);
     setLoading(false);
   }, []);
 
@@ -61,11 +65,8 @@ export default function StatsPage() {
     else setPwError('비밀번호가 틀렸습니다.');
   };
 
-  // 통계 계산 (logs 변경 시에만 재계산)
-  const { total, found, notFound, topAgencies, dailyEntries, maxDaily, hourCount, maxHour } = useMemo(() => {
-    const total = logs.length;
-    const found = logs.filter(l => l.found).length;
-
+  // 통계 계산 (logs 변경 시에만 재계산) — 일별/시간대별/기관 TOP10은 최근 500건 샘플 기준
+  const { topAgencies, dailyEntries, maxDaily, hourCount, maxHour } = useMemo(() => {
     const agencyCount: Record<string, number> = {};
     for (const l of logs) {
       if (l.result_agency_full) {
@@ -94,8 +95,10 @@ export default function StatsPage() {
       hourCount[kh]++;
     }
 
-    return { total, found, notFound: total - found, topAgencies, dailyEntries, maxDaily, hourCount, maxHour: Math.max(...hourCount, 1) };
+    return { topAgencies, dailyEntries, maxDaily, hourCount, maxHour: Math.max(...hourCount, 1) };
   }, [logs]);
+
+  const notFoundCount = totalCount - foundCount;
 
   if (!isAdmin) {
     return (
@@ -185,9 +188,9 @@ export default function StatsPage() {
             {/* 요약 카드 */}
             <div className="grid grid-cols-3 gap-3">
               {[
-                { label: '총 조회 수', value: total, color: 'text-[#0d2d6b]' },
-                { label: '결과 있음', value: found, color: 'text-emerald-600' },
-                { label: '결과 없음', value: notFound, color: 'text-red-400' },
+                { label: '총 조회 수', value: totalCount, color: 'text-[#0d2d6b]' },
+                { label: '결과 있음', value: foundCount, color: 'text-emerald-600' },
+                { label: '결과 없음', value: notFoundCount, color: 'text-red-400' },
               ].map(({ label, value, color }) => (
                 <div key={label} className="bg-white rounded-2xl border border-gray-100 p-4 text-center shadow-sm">
                   <p className={`text-2xl font-bold ${color}`}>{value.toLocaleString()}</p>
@@ -198,7 +201,8 @@ export default function StatsPage() {
 
             {/* 일별 조회 수 (최근 14일) */}
             <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-              <p className="text-sm font-semibold text-gray-700 mb-3">📅 일별 조회 수 (최근 14일)</p>
+              <p className="text-sm font-semibold text-gray-700">📅 일별 조회 수 (최근 14일)</p>
+              <p className="text-[10px] text-gray-400 mb-3">최근 500건 샘플 기준</p>
               <div className="flex items-end gap-1 h-24">
                 {dailyEntries.map(([date, count]) => (
                   <div key={date} className="flex-1 flex flex-col items-center gap-1 min-w-0">
@@ -214,7 +218,8 @@ export default function StatsPage() {
 
             {/* 시간대별 */}
             <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-              <p className="text-sm font-semibold text-gray-700 mb-3">🕐 시간대별 조회 (0~23시)</p>
+              <p className="text-sm font-semibold text-gray-700">🕐 시간대별 조회 (0~23시)</p>
+              <p className="text-[10px] text-gray-400 mb-3">최근 500건 샘플 기준</p>
               <div className="flex items-end gap-0.5 h-16">
                 {hourCount.map((cnt, h) => (
                   <div key={h} className="flex-1 flex flex-col items-center gap-0.5 min-w-0">
@@ -230,7 +235,8 @@ export default function StatsPage() {
 
             {/* 기관별 TOP 10 */}
             <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-              <p className="text-sm font-semibold text-gray-700 mb-3">🏢 자주 조회된 관리기관 TOP 10</p>
+              <p className="text-sm font-semibold text-gray-700">🏢 자주 조회된 관리기관 TOP 10</p>
+              <p className="text-[10px] text-gray-400 mb-3">최근 500건 샘플 기준</p>
               {topAgencies.length === 0 ? (
                 <p className="text-sm text-gray-400 text-center py-4">데이터 없음</p>
               ) : (
