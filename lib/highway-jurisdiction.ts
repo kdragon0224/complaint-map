@@ -102,7 +102,6 @@ const PRIVATE_ROAD_CODES: Record<string, string> = {
   '1102': '인천대교(주)',               // 인천대교선 (보간 포인트)
   '9153': '제2서해안고속도로(주)',      // 평택시흥선 (보간 포인트)
   '9601': '제2서해안고속도로(주)',      // 수도권제2순환선(시화MTV), 남안산JCT~시화IC (보간 포인트)
-  '9402': '서울북부고속도로(주)',       // 구리포천지선 (보간 포인트)
   '9055': '신대구부산고속도로(주)',     // 중앙선(대구부산) (보간 포인트)
   '9403': '포천화도고속도로(주)',       // 수도권제2순환선 포천~화도 (민자, 2024 개통, 보간 포인트)
 };
@@ -237,9 +236,14 @@ const JURISDICTION_RULES: JurisdictionRule[] = [
   // ═══════════════════════════════════════════════════════════
   { etcCode: '0290', kmStart: 0.0,    kmEnd: 44.60,   hq: '수도권본부',   branch: '파주지사' },
   { etcCode: '0290', kmStart: 56.39,  kmEnd: 128.62,  hq: '서울경기본부', branch: '용인지사' },
+  // 0291(구리포천선)은 ETC 좌표상 0290의 0~44.60km 구간과 물리적으로 동일 노선이지만
+  // 코드가 달라 직제 표에서 누락됐던 것을 확인해 동일 규칙을 등록 (§PRD 2-1, 4-3)
+  { etcCode: '0291', kmStart: 0.0,    kmEnd: 44.60,   hq: '수도권본부',   branch: '파주지사' },
 
   // ═══════════════════════════════════════════════════════════
   //  양주지선 (0292) — 세종포천선 지선, 수도권본부 파주지사
+  //  ETC 좌표 데이터는 0~5.9km까지만 존재 (소흘~양주). 직제 표의 26.11km까지
+  //  나머지 구간(양주~법원)은 좌표 데이터를 아직 확보하지 못해 미반영 상태.
   // ═══════════════════════════════════════════════════════════
   { etcCode: '0292', kmStart: 0.0,    kmEnd: 26.11,   hq: '수도권본부',   branch: '파주지사' },
 
@@ -467,8 +471,10 @@ export function getPrivateOperator(etcCode: string): string | null {
  * ETC 4자리 코드와 이정(km)으로 관할 지역본부/지사 조회
  */
 export function lookupJurisdiction(etcCode: string, km: number): { hq: string; branch: string } | null {
-  if (getPrivateOperator(etcCode)) return null;
-
+  // ※ 2026-08-13: 예전엔 민자 코드면 직제 조회를 아예 건너뛰었으나(민자 우선순위 시절의 잔재),
+  // formatAgency()가 직제를 최우선으로 확인하도록 바뀌면서(§PRD 2-1) 이 가드가 오히려
+  // 0291처럼 "민자 매핑도 있고 직제 규칙도 있는" 코드에서 직제 매칭을 무력화시키는 버그가 됨.
+  // 우선순위 판단은 formatAgency()가 전담하므로 여기서는 순수하게 규칙 매칭만 한다.
   for (const rule of JURISDICTION_RULES) {
     if (rule.etcCode === etcCode && km >= rule.kmStart && km <= rule.kmEnd) {
       return { hq: rule.hq, branch: rule.branch };
