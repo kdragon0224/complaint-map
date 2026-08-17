@@ -492,15 +492,20 @@ export function lookupJurisdiction(etcCode: string, km: number): { hq: string; b
  * 관할 정보로 표시용 문자열 생성
  */
 export function formatAgency(etcCode: string, km: number, fallbackIcName?: string): string {
+  // 1순위: 직제세부운영계획 (JURISDICTION_RULES) — 등재돼 있으면 도공 관할로 확정
+  // ※ 2026-08-13 우선순위 변경: 기존엔 PRIVATE_ROAD_CODES가 최우선이라 직제 등재 여부를
+  //   아예 조회하지 않았음. ETC 좌표코드와 직제 원문(hwpx)의 노선코드가 달라(예: 구리포천선
+  //   0291 ↔ 직제상 세종포천선 0290) 같은 물리 구간이 두 코드로 나뉘는 사례가 있어, 직제 등재를
+  //   우선 확인하도록 변경. PRD §4-3 "km 축 불일치" 사례와 동일 패턴.
+  const j = lookupJurisdiction(etcCode, km);
+  if (j) return `한국도로공사 ${j.hq} ${j.branch}`;
+
   const privateOp = getPrivateOperator(etcCode);
   if (privateOp) return privateOp;
 
   // 타기관 이관 구간 (경부간선도로 등)
   const t = TRANSFERRED_SECTIONS.find(s => s.etcCode === etcCode && km >= s.kmStart && km <= s.kmEnd);
   if (t) return t.agency;
-
-  const j = lookupJurisdiction(etcCode, km);
-  if (j) return `한국도로공사 ${j.hq} ${j.branch}`;
 
   // 직제 미기재 구간 — 도공 관할로 단정하지 않음 (민자·이관 가능성)
   if (fallbackIcName) return `관할 확인 필요 (${fallbackIcName} 인근, 직제 미기재 구간)`;
