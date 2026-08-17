@@ -135,6 +135,9 @@ export function resolveNationalRoad(region: RegionInfo): string {
   if (isMergedMetroGu(region.sido, region.sigungu)) return `${region.sido} (시 관리 국도 구간)`;
   if (region.sido === '제주특별자치도') return '제주특별자치도 (도로관리부서)';
   if (isCityDong(region)) return `${cityName(region)} (시 관리 국도 구간)`;
+  // 경북 전역은 부산지방국토관리청 관할이나, 상주시 화북면만 예외적으로 대전지방국토관리청
+  // (보은국토관리사무소) 관할이다 — 국토교통부와 그 소속기관 직제 시행규칙 [별표 2] 참조 (§2-1)
+  if (region.sigungu.includes('상주시') && region.dong.includes('화북면')) return '대전지방국토관리청';
   return RRO_BY_SIDO[region.sido] ?? '지방국토관리청';
 }
 
