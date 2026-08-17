@@ -107,6 +107,17 @@ const PRIVATE_ROAD_CODES: Record<string, string> = {
   '9403': '포천화도고속도로(주)',       // 수도권제2순환선 포천~화도 (민자, 2024 개통, 보간 포인트)
 };
 
+// ETC 도로중심선 CSV상 노선명이 카카오맵 등에 표시되는 공식 노선명과 달라
+// 민원 오해를 부를 수 있는 경우, "ETC명(공식명)"으로 병기 표시하기 위한 테이블
+// 사례 발견될 때마다 추가
+const ROUTE_DISPLAY_ALIAS: Record<string, string> = {
+  '0291': '세종포천고속도로',  // ETC 데이터명은 "구리포천선"(개통구간 한정), 카카오맵 등은 전체 노선번호명 "세종포천고속도로"로 표시
+};
+
+export function getRouteDisplayAlias(etcCode: string): string | null {
+  return ROUTE_DISPLAY_ALIAS[etcCode] ?? null;
+}
+
 // 관할 구간 테이블 (2026년 직제세부운영계획.hwpx 기준)
 // ETC 4자리 코드 + km 범위로 직접 조회
 const JURISDICTION_RULES: JurisdictionRule[] = [

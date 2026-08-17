@@ -293,12 +293,28 @@ export default function Home() {
                       }`}>
                         {rec.roadType}
                       </span>
-                      {rec.routeName.replace(/\s*\(.*?\)/, '')}
                       {(() => {
-                        const paren = rec.routeName.match(/\(([^)]+)\)/)?.[1];
-                        if (!paren) return null;
-                        // km 이정은 "지점", 도로명은 그대로 표시
-                        return <span className="ml-1">{paren.includes('km') ? `${paren} 지점` : paren}</span>;
+                        // km 이정 괄호(문자열 끝)는 "N.Nkm 지점"으로, 그 외 괄호(도로명 등)는 그대로 표시.
+                        // 노선명 병기("구리포천선(세종포천고속도로)")처럼 괄호가 두 개일 수 있으므로
+                        // km 괄호는 반드시 끝에서만 찾는다.
+                        const name = rec.routeName;
+                        const kmMatch = name.match(/\(([\d.]+km)\)\s*$/);
+                        if (kmMatch) {
+                          return (
+                            <>
+                              {name.slice(0, kmMatch.index).trimEnd()}
+                              <span className="ml-1">{kmMatch[1]} 지점</span>
+                            </>
+                          );
+                        }
+                        const anyMatch = name.match(/\(([^)]+)\)/);
+                        if (!anyMatch) return name;
+                        return (
+                          <>
+                            {name.replace(/\s*\(.*?\)/, '')}
+                            <span className="ml-1">{anyMatch[1]}</span>
+                          </>
+                        );
                       })()}
                     </p>
 

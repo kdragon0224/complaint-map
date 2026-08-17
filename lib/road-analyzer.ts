@@ -13,7 +13,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { formatAgency, lookupJurisdiction } from './highway-jurisdiction';
+import { formatAgency, lookupJurisdiction, getRouteDisplayAlias } from './highway-jurisdiction';
 import { getBranchContacts, BranchContact } from './branch-contacts';
 
 const DATA_DIR = path.join(process.cwd(), 'public', 'data');
@@ -176,10 +176,13 @@ function findNearbyHighways(lat: number, lng: number): RoadCandidate[] {
     const jurisdiction = lookupJurisdiction(pt.r, pt.k);
     const contacts = jurisdiction ? getBranchContacts(jurisdiction.branch) ?? undefined : undefined;
 
+    const alias = getRouteDisplayAlias(pt.r);
+    const displayName = alias ? `${pt.n}(${alias})` : pt.n;
+
     results.push({
       type: '고속국도',
       routeNo: pt.r,
-      routeName: `${pt.n} (${pt.k.toFixed(1)}km)`,
+      routeName: `${displayName} (${pt.k.toFixed(1)}km)`,
       agency,
       agencyFull: agency,
       distanceM: Math.round(pt.dist),
