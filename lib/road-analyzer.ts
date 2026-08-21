@@ -19,7 +19,13 @@ import { getBranchContacts, BranchContact } from './branch-contacts';
 const DATA_DIR = path.join(process.cwd(), 'public', 'data');
 const GRID_SIZE = 0.1;
 const SEARCH_RADIUS_M = 500;
-const HIGHWAY_PRIORITY_THRESHOLD_M = 200; // 고속도로가 이 거리 이내면 OSM 탐색 생략
+// 고속도로가 이 거리 이내면 OSM(국도·지방도) 탐색을 생략한다.
+// 2026-08-21 200m → 50m로 축소: 경춘로처럼 고속도로 바로 옆/밑을 지나는 국도가
+// 74m 거리로 고속도로(경춘로보다 먼)보다 더 가까운데도, 200m 기준 때문에 국도 쪽은
+// 아예 확인조차 안 하고 고속도로로 확정해버리는 사례를 발견해 기준을 좁혔다.
+// 50m 이내처럼 확실히 고속도로 위인 경우만 생략하고, 그 밖의 애매한 거리는 국도·
+// 지방도도 같이 확인해서 진짜 최근접 후보가 이기도록 한다.
+const HIGHWAY_PRIORITY_THRESHOLD_M = 50;
 
 // ── 타입 ────────────────────────────────────────────────────────────────
 
