@@ -17,13 +17,17 @@ const supabase = createClient(
 );
 
 const HIGHWAY_KEYWORDS = [
-  'IC', 'JC', '인터체인지', '분기점', '휴게소', 'SA',
+  'IC', 'JC', '인터체인지', '분기점', '휴게소', 'SA', '터널', '대교',
   '한국도로공사', '도로공사', '고속도로',
 ];
 
 function highwayScore(doc: { place_name?: string; address_name?: string; category_name?: string }): number {
   const name = (doc.place_name || doc.address_name || '').toUpperCase();
   const cat = (doc.category_name || '').toUpperCase();
+  // 카카오 카테고리가 "교통,수송 > 도로시설 > ..."이면 터널·대교·천교·고가교 등 이름을
+  // 일일이 나열 안 해도 전부 도로시설로 인식된다 (예: "용산천교"는 이름에 '대교'가 없어
+  // 키워드 목록만으로는 안 걸렸는데, 카테고리는 "도로시설 > 교량,다리"로 잡힘).
+  if (cat.includes('도로시설')) return 1;
   return HIGHWAY_KEYWORDS.some(kw => name.includes(kw.toUpperCase()) || cat.includes(kw.toUpperCase())) ? 1 : 0;
 }
 
@@ -67,7 +71,17 @@ async function geocode(
     };
   }
 
-  const addrDoc = addrDocs[0];
+  const kwDocs: any[] = kwData.documents || [];
+
+  // 쿼리와 이름이 완전히 일치하는 장소(시설)가 키워드 검색에 있으면 주소 검색보다 우선한다.
+  // 카카오 주소 API는 "관촌2터널" 같은 질의에서 "터널"을 무시하고 "관촌"+지번"2"로 엉뚱하게
+  // 해석해 실제와 무관한 주소(관촌리 2번지)를 반환하는 경우가 있음 — "호남터널"처럼 그런
+  // 오해석이 안 생기는 이름은 우연히 정상 동작해서 이번에 발견됨.
+  const exactKwMatch = kwDocs.find(
+    d => (d.place_name || '').trim().toLowerCase() === query.trim().toLowerCase(),
+  );
+
+  const addrDoc = exactKwMatch ? undefined : addrDocs[0];
   if (addrDoc) {
     // 주소 검색 응답에 행정구역이 포함되어 있어 별도 API 호출 불필요
     const a = addrDoc.address ?? addrDoc.road_address;
@@ -81,7 +95,6 @@ async function geocode(
     return { lat: parseFloat(addrDoc.y), lng: parseFloat(addrDoc.x), region };
   }
 
-  const kwDocs: any[] = kwData.documents || [];
   if (kwDocs.length === 0) return null;
 
   // 동일한 이름(예: "장수IC")이 서로 다른 시/도에 동시에 존재 — 자동으로 하나를 고르지 않고 선택지를 제시
