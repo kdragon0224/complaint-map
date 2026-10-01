@@ -223,9 +223,13 @@ export async function GET(req: NextRequest) {
     !roadResult.recommendation ||
     roadResult.candidates.some(c => c.type !== '고속국도' && !c.agencyFull);
 
+  // 지역별 통계(§14-2)용 — 판정에 이미 행정구역이 쓰였으면 재사용, 아니면 로그 저장 시 별도 조회
+  let resolvedRegion: RegionInfo | null = preRegion;
+
   if (needsRegion && key) {
     const region = preRegion ?? await fetchRegion(lat, lng, key);
     if (region) {
+      resolvedRegion = region;
       for (const c of roadResult.candidates) {
         if (c.agencyFull) continue;
         // 민자 지방도·교량 (제3경인고속화도로 등) — 도로명 우선 매칭
@@ -269,18 +273,31 @@ export async function GET(req: NextRequest) {
   const rec = roadResult.recommendation;
 
   // 백그라운드 로그 저장 (nolog=1 이면 생략 — 자동 테스트용)
-  if (!searchParams.get('nolog')) supabase.from('query_logs').insert({
-    input_address: inputAddress,
-    lat,
-    lng,
-    result_agency: rec?.agency ?? null,
-    result_agency_full: rec?.agencyFull ?? null,
-    result_road_type: rec?.roadType ?? null,
-    result_route_name: rec?.routeName ?? null,
-    result_distance_m: rec?.distanceM ?? null,
-    confidence: rec?.confidence ?? null,
-    found: !!rec,
-  }).then(() => {});
+  if (!searchParams.get('nolog')) {
+    const logBase = {
+      input_address: inputAddress,
+      lat,
+      lng,
+      result_agency: rec?.agency ?? null,
+      result_agency_full: rec?.agencyFull ?? null,
+      result_road_type: rec?.roadType ?? null,
+      result_route_name: rec?.routeName ?? null,
+      result_distance_m: rec?.distanceM ?? null,
+      confidence: rec?.confidence ?? null,
+      found: !!rec,
+    };
+    // 지역별 통계(§14-2)용 sido — 이미 구했으면 그대로 쓰고, 없으면 응답은 막지 않고
+    // 백그라운드에서 한 번 더 조회해 로그에만 채운다 (고속국도 단독 판정 시 흔한 경로)
+    if (resolvedRegion) {
+      supabase.from('query_logs').insert({ ...logBase, sido: resolvedRegion.sido }).then(() => {});
+    } else if (key) {
+      fetchRegion(lat, lng, key).then(r => {
+        supabase.from('query_logs').insert({ ...logBase, sido: r?.sido ?? null }).then(() => {});
+      });
+    } else {
+      supabase.from('query_logs').insert(logBase).then(() => {});
+    }
+  }
 
   return NextResponse.json({ lat, lng, placeName, ...roadResult });
 }

@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 
 const KakaoMap = dynamic(() => import('@/components/KakaoMap'), { ssr: false });
+const RegionStatsMap = dynamic(() => import('@/components/RegionStatsMap'), { ssr: false });
 
 const ADMIN_PASSWORD = '2504';
 
@@ -42,8 +43,40 @@ export default function StatsPage() {
   const [totalCount, setTotalCount] = useState(0);
   const [foundCount, setFoundCount] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [tab, setTab] = useState<'overview' | 'logs'>('overview');
+  const [tab, setTab] = useState<'overview' | 'region' | 'logs'>('overview');
   const [selectedLog, setSelectedLog] = useState<Log | null>(null);
+
+  // 지역별 통계: month(YYYY-MM) -> sido -> 건수
+  const [regionMonthly, setRegionMonthly] = useState<Record<string, Record<string, number>> | null>(null);
+  const [regionUnclassified, setRegionUnclassified] = useState(0);
+  const [regionLoading, setRegionLoading] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+  const [hoveredSido, setHoveredSido] = useState<string | null>(null);
+
+  const fetchRegionStats = useCallback(async () => {
+    setRegionLoading(true);
+    // sido/queried_at 두 컬럼만 — 전체 기간 집계용이라 overview의 500건 샘플과 별도로 전수 조회
+    const { data } = await supabase.from('query_logs').select('sido, queried_at').limit(20000);
+    const byMonth: Record<string, Record<string, number>> = {};
+    let unclassified = 0;
+    const ymFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit' });
+    for (const row of data || []) {
+      const parts = ymFormatter.formatToParts(new Date(row.queried_at as string));
+      const ym = `${parts.find(p => p.type === 'year')?.value}-${parts.find(p => p.type === 'month')?.value}`;
+      if (!byMonth[ym]) byMonth[ym] = {};
+      const sido = row.sido as string | null;
+      if (sido) byMonth[ym][sido] = (byMonth[ym][sido] || 0) + 1;
+      else unclassified++;
+    }
+    setRegionMonthly(byMonth);
+    setRegionUnclassified(unclassified);
+    setSelectedMonth(prev => prev ?? Object.keys(byMonth).sort().pop() ?? null);
+    setRegionLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (isAdmin && tab === 'region' && regionMonthly === null) fetchRegionStats();
+  }, [isAdmin, tab, regionMonthly, fetchRegionStats]);
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
@@ -163,7 +196,7 @@ export default function StatsPage() {
       <div className={`${tab === 'logs' ? 'max-w-6xl' : 'max-w-3xl'} w-full mx-auto p-4 flex flex-col gap-4`}>
         {/* 탭 */}
         <div className="flex gap-2">
-          {(['overview', 'logs'] as const).map(t => (
+          {(['overview', 'region', 'logs'] as const).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -171,7 +204,7 @@ export default function StatsPage() {
                 tab === t ? 'bg-[#0d2d6b] text-white' : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-100'
               }`}
             >
-              {t === 'overview' ? '📊 통계 요약' : '📋 조회 기록'}
+              {t === 'overview' ? '📊 통계 요약' : t === 'region' ? '🗺️ 지역별 통계' : '📋 조회 기록'}
             </button>
           ))}
           <button onClick={fetchLogs} className="ml-auto text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
@@ -263,6 +296,88 @@ export default function StatsPage() {
                 </div>
               )}
             </div>
+          </>
+        ) : tab === 'region' ? (
+          <>
+            {regionLoading || !regionMonthly ? (
+              <div className="flex justify-center py-16">
+                <div className="w-8 h-8 border-4 border-blue-100 border-t-[#0d2d6b] rounded-full animate-spin" />
+              </div>
+            ) : Object.keys(regionMonthly).length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-8">데이터 없음</p>
+            ) : (
+              <>
+                {/* 월 선택 */}
+                <div className="bg-white rounded-2xl border border-gray-100 p-3 shadow-sm flex items-center justify-center gap-3">
+                  {(() => {
+                    const months = Object.keys(regionMonthly).sort();
+                    const idx = selectedMonth ? months.indexOf(selectedMonth) : -1;
+                    return (
+                      <>
+                        <button
+                          disabled={idx <= 0}
+                          onClick={() => setSelectedMonth(months[idx - 1])}
+                          className="w-8 h-8 rounded-full bg-gray-50 text-gray-500 disabled:opacity-30 hover:bg-gray-100"
+                        >
+                          ‹
+                        </button>
+                        <p className="text-sm font-bold text-[#0d2d6b] w-24 text-center">{selectedMonth}</p>
+                        <button
+                          disabled={idx === -1 || idx >= months.length - 1}
+                          onClick={() => setSelectedMonth(months[idx + 1])}
+                          className="w-8 h-8 rounded-full bg-gray-50 text-gray-500 disabled:opacity-30 hover:bg-gray-100"
+                        >
+                          ›
+                        </button>
+                      </>
+                    );
+                  })()}
+                </div>
+
+                {/* 지도 */}
+                <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+                  <p className="text-sm font-semibold text-gray-700 mb-1">
+                    🗺️ {selectedMonth} 시도별 조회 건수
+                  </p>
+                  <p className="text-[10px] text-gray-400 mb-3">
+                    실제 행정구역 경계가 아닌 상대 위치 기준 간략 배치도입니다
+                    {regionUnclassified > 0 && ` · 시도 미분류 ${regionUnclassified.toLocaleString()}건(과거 데이터, 백필 전)`}
+                  </p>
+                  <RegionStatsMap
+                    counts={selectedMonth ? regionMonthly[selectedMonth] ?? {} : {}}
+                    onHover={setHoveredSido}
+                  />
+                </div>
+
+                {/* 순위 목록 (정확한 숫자 확인용) */}
+                <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+                  <p className="text-sm font-semibold text-gray-700 mb-3">📋 {selectedMonth} 순위</p>
+                  {(() => {
+                    const counts = selectedMonth ? regionMonthly[selectedMonth] ?? {} : {};
+                    const ranked = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+                    const top = ranked[0]?.[1] || 1;
+                    if (ranked.length === 0) return <p className="text-sm text-gray-400 text-center py-4">데이터 없음</p>;
+                    return (
+                      <div className="flex flex-col gap-2">
+                        {ranked.map(([sido, count]) => (
+                          <div key={sido} className={`flex items-center gap-2 rounded-lg px-1 ${hoveredSido === sido ? 'bg-blue-50' : ''}`}>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between mb-0.5">
+                                <p className="text-xs text-gray-700">{sido}</p>
+                                <p className="text-xs font-semibold text-gray-500 ml-2 shrink-0">{count.toLocaleString()}건</p>
+                              </div>
+                              <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                <div className="h-full bg-[#0d2d6b] rounded-full" style={{ width: `${(count / top) * 100}%` }} />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </>
+            )}
           </>
         ) : (
           /* 조회 기록: 좌측 목록 / 우측 상세 (PC 2단 레이아웃) */
