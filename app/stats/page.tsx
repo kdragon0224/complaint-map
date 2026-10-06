@@ -56,11 +56,19 @@ export default function StatsPage() {
   const fetchRegionStats = useCallback(async () => {
     setRegionLoading(true);
     // sido/queried_at 두 컬럼만 — 전체 기간 집계용이라 overview의 500건 샘플과 별도로 전수 조회
-    const { data } = await supabase.from('query_logs').select('sido, queried_at').limit(20000);
+    // Supabase는 한 번에 최대 1,000행만 돌려주므로(limit을 크게 줘도 잘림) 1,000행씩 페이지를 넘겨 전부 모은다
+    const data: { sido: string | null; queried_at: string }[] = [];
+    for (let from = 0; ; from += 1000) {
+      const { data: page } = await supabase
+        .from('query_logs').select('sido, queried_at').order('id', { ascending: true }).range(from, from + 999);
+      if (!page || page.length === 0) break;
+      data.push(...(page as { sido: string | null; queried_at: string }[]));
+      if (page.length < 1000) break;
+    }
     const byMonth: Record<string, Record<string, number>> = {};
     let unclassified = 0;
     const ymFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit' });
-    for (const row of data || []) {
+    for (const row of data) {
       const parts = ymFormatter.formatToParts(new Date(row.queried_at as string));
       const ym = `${parts.find(p => p.type === 'year')?.value}-${parts.find(p => p.type === 'month')?.value}`;
       if (!byMonth[ym]) byMonth[ym] = {};
@@ -341,7 +349,7 @@ export default function StatsPage() {
                   </p>
                   <p className="text-[10px] text-gray-400 mb-3">
                     실제 행정구역 경계가 아닌 상대 위치 기준 간략 배치도입니다
-                    {regionUnclassified > 0 && ` · 시도 미분류 ${regionUnclassified.toLocaleString()}건(과거 데이터, 백필 전)`}
+                    {regionUnclassified > 0 && ` · 전체 기간 시도 미분류 ${regionUnclassified.toLocaleString()}건(바다 위 좌표 등 행정구역 없음)`}
                   </p>
                   <RegionStatsMap
                     counts={selectedMonth ? regionMonthly[selectedMonth] ?? {} : {}}

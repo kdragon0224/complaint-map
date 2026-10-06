@@ -59,7 +59,7 @@ def normalize_sido(name: str) -> str:
     return aliases.get(name, name)
 
 
-def fetch_rows_without_sido(limit=1000, offset=0):
+def fetch_rows_without_sido(after_id=0, limit=200):
     headers = [
         f'apikey: {SERVICE_KEY}',
         f'Authorization: Bearer {SERVICE_KEY}',
@@ -67,7 +67,7 @@ def fetch_rows_without_sido(limit=1000, offset=0):
     url = (
         f'{SUPABASE_URL}/rest/v1/query_logs'
         f'?select=id,lat,lng&sido=is.null&lat=not.is.null&lng=not.is.null'
-        f'&order=id.asc&limit={limit}&offset={offset}'
+        f'&id=gt.{after_id}&order=id.asc&limit={limit}'
     )
     return curl_json('GET', url, headers) or []
 
@@ -101,11 +101,13 @@ def main():
     total_updated = 0
     total_failed = 0
 
+    last_id = 0  # id 기준으로 한 번씩만 훑는다 — 바다 위 좌표처럼 시도를 못 구하는 행이 무한 재조회되는 걸 방지
     while True:
-        rows = fetch_rows_without_sido(limit=200)
+        rows = fetch_rows_without_sido(after_id=last_id)
         if not rows:
             break
         for row in rows:
+            last_id = row['id']
             lat, lng = row.get('lat'), row.get('lng')
             if lat is None or lng is None:
                 update_sido(row['id'], None)
@@ -120,7 +122,7 @@ def main():
                 total_updated += 1
             else:
                 total_failed += 1
-                print('조회 실패:', row['id'], lat, lng)
+                print('조회 실패(해상 좌표 등):', row['id'], lat, lng)
         print(f'진행: {total_updated}건 채움, {total_failed}건 실패, 캐시 {len(cache)}개 좌표')
 
     print(f'완료 — 총 {total_updated}건 채움, {total_failed}건 실패')
