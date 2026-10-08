@@ -165,21 +165,36 @@ export default function Home() {
           <img src="/ex-logo.png" alt="EX" style={{ height: '13px', width: 'auto', flexShrink: 0 }} />
           <div>
             <h1 className="font-bold leading-tight tracking-tight" style={{ fontSize: '14.6px' }}>
-              <span className="whitespace-nowrap">AI 민원배부 내비게이션</span>{' '}
-              <span className="text-blue-200 font-normal whitespace-nowrap" style={{ fontSize: '11px' }}>(한국도로공사 전북본부 제작)</span>
+              <span className="whitespace-nowrap">AI 민원배부 내비게이션</span>
             </h1>
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-        <button
-          onClick={() => setShowPromo(true)}
-          className="bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-1.5 rounded-full transition-colors whitespace-nowrap"
-        >
-          ▶ 사용법
-        </button>
-        <Link href="/admin" className="bg-yellow-400 hover:bg-yellow-300 text-[#0d2d6b] text-xs font-bold px-3 py-1.5 rounded-full transition-colors shrink-0 whitespace-nowrap shadow-sm">
-          ⚙️ 관리자
-        </Link>
+        {/* 휴대폰은 폭이 좁아 아이콘만, sm(640px) 이상에서 글자까지 표시 */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <button
+            onClick={() => setShowPromo(true)}
+            aria-label="사용법 영상"
+            title="사용법 영상"
+            className="bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-2.5 sm:px-3 py-1.5 rounded-full transition-colors whitespace-nowrap"
+          >
+            ▶<span className="hidden sm:inline"> 사용법</span>
+          </button>
+          <Link
+            href="/region-stats"
+            aria-label="지역별 통계"
+            title="지역별 통계"
+            className="bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-2.5 sm:px-3 py-1.5 rounded-full transition-colors whitespace-nowrap"
+          >
+            🗺️<span className="hidden sm:inline"> 지역별 통계</span>
+          </Link>
+          <Link
+            href="/admin"
+            aria-label="관리자"
+            title="관리자"
+            className="bg-yellow-400 hover:bg-yellow-300 text-[#0d2d6b] text-xs font-bold px-2.5 sm:px-3 py-1.5 rounded-full transition-colors shrink-0 whitespace-nowrap shadow-sm"
+          >
+            ⚙️<span className="hidden sm:inline"> 관리자</span>
+          </Link>
         </div>
       </header>
 
