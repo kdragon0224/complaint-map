@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { isCoarsePointer } from '@/lib/device';
 
 const KakaoMap = dynamic(() => import('@/components/KakaoMap'), { ssr: false });
+const PromoVideoModal = dynamic(() => import('@/components/PromoVideoModal'), { ssr: false });
 
 interface BranchContact {
   label: string;
@@ -44,6 +45,7 @@ export default function Home() {
   const [pinLat, setPinLat] = useState(DEFAULT_LAT);
   const [pinLng, setPinLng] = useState(DEFAULT_LNG);
   const [showMap, setShowMap] = useState(true);
+  const [showPromo, setShowPromo] = useState(false);
   const [result, setResult] = useState<SearchResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -154,6 +156,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
+      {showPromo && <PromoVideoModal onClose={() => setShowPromo(false)} />}
 
       {/* 헤더 */}
       <header className="bg-[#0d2d6b] text-white px-4 py-2 flex items-center justify-between shadow-lg z-10 shrink-0">
@@ -167,9 +170,17 @@ export default function Home() {
             </h1>
           </div>
         </div>
+        <div className="flex items-center gap-2 shrink-0">
+        <button
+          onClick={() => setShowPromo(true)}
+          className="bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-1.5 rounded-full transition-colors whitespace-nowrap"
+        >
+          ▶ 사용법
+        </button>
         <Link href="/admin" className="bg-yellow-400 hover:bg-yellow-300 text-[#0d2d6b] text-xs font-bold px-3 py-1.5 rounded-full transition-colors shrink-0 whitespace-nowrap shadow-sm">
           ⚙️ 관리자
         </Link>
+        </div>
       </header>
 
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden" style={{ height: 'calc(100vh - 56px)' }}>
