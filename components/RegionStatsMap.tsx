@@ -43,7 +43,7 @@ function colorFor(ratio: number) {
 // SVG 단위 [dx, dy] — +dx 오른쪽, +dy 아래.
 const LABEL_OFFSET: Record<string, [number, number]> = {
   '경기도': [12, 22],
-  '충청북도': [4, 46],
+  '충청북도': [2, 23],
   '전북특별자치도': [-16, -10],
   '경상남도': [16, 10],
 };
