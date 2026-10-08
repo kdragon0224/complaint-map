@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { analyzeRoad, findRoutePointByKm } from '@/lib/road-analyzer';
 import {
   RegionInfo,
@@ -286,17 +286,18 @@ export async function GET(req: NextRequest) {
       confidence: rec?.confidence ?? null,
       found: !!rec,
     };
-    // 지역별 통계(§14-2)용 sido — 이미 구했으면 그대로 쓰고, 없으면 응답은 막지 않고
-    // 백그라운드에서 한 번 더 조회해 로그에만 채운다 (고속국도 단독 판정 시 흔한 경로)
-    if (resolvedRegion) {
-      supabase.from('query_logs').insert({ ...logBase, sido: resolvedRegion.sido }).then(() => {});
-    } else if (key) {
-      fetchRegion(lat, lng, key).then(r => {
-        supabase.from('query_logs').insert({ ...logBase, sido: r?.sido ?? null }).then(() => {});
-      });
-    } else {
-      supabase.from('query_logs').insert(logBase).then(() => {});
-    }
+    // 지역별 통계(§14-2)용 sido — 이미 구했으면 그대로 쓰고, 없으면 응답은 막지 않고 한 번 더 조회해 로그에만 채운다
+    // (고속국도 단독 판정 시 흔한 경로). 응답 뒤 작업은 서버리스에서 끊길 수 있어 after()로 끝까지 실행을 보장한다.
+    after(async () => {
+      try {
+        let sido: string | null | undefined = resolvedRegion?.sido;
+        if (!resolvedRegion && key) sido = (await fetchRegion(lat, lng, key))?.sido ?? null;
+        const row: Record<string, unknown> = sido === undefined ? { ...logBase } : { ...logBase, sido };
+        await supabase.from('query_logs').insert(row);
+      } catch {
+        // 로그 저장 실패는 조회 결과에 영향을 주지 않는다
+      }
+    });
   }
 
   return NextResponse.json({ lat, lng, placeName, ...roadResult });
