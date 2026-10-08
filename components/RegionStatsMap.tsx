@@ -39,6 +39,14 @@ function colorFor(ratio: number) {
   return `rgb(${mix[0]}, ${mix[1]}, ${mix[2]})`;
 }
 
+// 자동 계산한 숫자 위치(도형 안에서 가장 넓은 지점)가 눈으로 보기엔 치우쳐 보이는 권역만 손으로 조금씩 옮긴다.
+// SVG 단위 [dx, dy] — +dx 오른쪽, +dy 아래.
+const LABEL_OFFSET: Record<string, [number, number]> = {
+  '경기도': [12, 22],
+  '전북특별자치도': [-16, -10],
+  '경상남도': [16, 10],
+};
+
 interface Props {
   counts: Record<string, number>; // 시도 -> 해당 월 조회 건수 (특별시·광역시도 원래 이름 그대로 들어온다)
   onHover?: (province: string | null) => void;
@@ -76,21 +84,23 @@ export default function RegionStatsMap({ counts: rawCounts, onHover }: Props) {
       ))}
 
       {/* 숫자는 이웃 도형에 가리지 않도록 도형을 전부 그린 뒤 얹는다 */}
-      {KOREA_MAP.provinces.map(({ province, cx, cy }) => {
+      {KOREA_MAP.provinces.map(({ province, cx: baseX, cy: baseY }) => {
         const count = counts[province] ?? 0;
         const dark = count / max > 0.55;
         const note = ABSORBED_NOTE[province];
-        const y = cy + (note ? -8 : 0);
+        const [dx, dy] = LABEL_OFFSET[province] ?? [0, 0];
+        const cx = baseX + dx;
+        const y = baseY + dy + (note ? -9 : 0);
         return (
           <g key={province} pointerEvents="none" textAnchor="middle">
-            <text x={cx} y={y - 6} fontSize={14} fontWeight={600} fill={dark ? '#ffffff' : '#334155'}>
+            <text x={cx} y={y - 7} fontSize={16} fontWeight={600} fill={dark ? '#ffffff' : '#334155'}>
               {SHORT[province]}
             </text>
-            <text x={cx} y={y + 15} fontSize={20} fontWeight={700} fill={dark ? '#ffffff' : '#0d2d6b'}>
+            <text x={cx} y={y + 17} fontSize={22} fontWeight={700} fill={dark ? '#ffffff' : '#0d2d6b'}>
               {count.toLocaleString()}
             </text>
             {note && (
-              <text x={cx} y={y + 30} fontSize={11} fill={dark ? '#dbe5fa' : '#64748b'}>
+              <text x={cx} y={y + 34} fontSize={13} fill={dark ? '#dbe5fa' : '#64748b'}>
                 {note} 포함
               </text>
             )}
