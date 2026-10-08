@@ -9,7 +9,7 @@
  1. 17개 시도를 한꺼번에 단순화(coverage_simplify) — 인접한 도 경계가 서로 어긋나 틈이 생기는 걸 막는다
  2. 특별시·광역시를 소재 도에 합침 — 매핑은 lib/sido-groups.ts의 PROVINCE_OF를 그대로 읽는다(한 곳에서만 관리)
  3. 너무 작은 섬·멀리 떨어진 서해 섬은 버리고, 울릉도는 육지 쪽으로 당겨 붙인다(지도를 세로로 길게 쓰기 위함)
- 4. 제주는 오른쪽 아래 점선 상자로 옮긴다
+ 4. 제주는 지도에 그리지 않는다(사용자 요청 — 제주 조회 기록이 있어도 지도엔 표시 안 함, 순위 목록에는 나온다)
  5. 경위도 → SVG 좌표로 바꾸고, 숫자를 얹을 라벨 위치(도형 안에서 가장 넓은 지점)를 계산한다
 
 실행: python3 scripts/build-korea-map.py   (shapely 필요: pip3 install shapely)
@@ -35,8 +35,6 @@ CLOSE_GAP = 0.004         # 도 — 합칠 때 원본 경계 사이에 남는 �
 FAR_WEST_LON = 125.6      # 이보다 서쪽 섬(백령도·흑산도 등)은 버린다
 ULLEUNG_LON = 130.0       # 이보다 동쪽(울릉도)은 육지 쪽으로 당긴다
 ULLEUNG_SHIFT = -0.85
-JEJU_CENTER = (129.0, 33.95)  # 제주를 옮겨 놓을 위치(경도, 위도)
-JEJU_BOX = (0.62, 0.42)       # 점선 상자의 반너비·반높이(도)
 SCALE = 150.0             # 1도당 px
 PAD = 12.0
 COS = math.cos(math.radians(36.0))
@@ -66,6 +64,8 @@ def main():
 
     shapes = {}  # 도 → 조각(Polygon) 목록 (경위도)
     for province, gs in grouped.items():
+        if province == '제주특별자치도':
+            continue
         if len(gs) > 1:
             # 서울·대전 등을 합칠 때 원본 경계가 완전히 맞물리지 않아 안쪽에 흰 윤곽선이 남는다 → 틈을 메우고 안쪽 구멍을 없앤다
             merged = unary_union([g.buffer(CLOSE_GAP, join_style='mitre') for g in gs]).buffer(-CLOSE_GAP, join_style='mitre')
@@ -77,18 +77,12 @@ def main():
             c = p.centroid
             if p.area < MIN_ISLAND_AREA:
                 continue
-            if province != '제주특별자치도' and c.x < FAR_WEST_LON:
+            if c.x < FAR_WEST_LON:
                 continue
             if province == '경상북도' and c.x > ULLEUNG_LON:
                 p = translate(p, xoff=ULLEUNG_SHIFT)
             kept.append(p)
         shapes[province] = kept
-
-    # 제주 → 점선 상자 안으로 이동
-    jeju = unary_union(shapes['제주특별자치도'])
-    jb = jeju.bounds
-    jx, jy = (jb[0] + jb[2]) / 2, (jb[1] + jb[3]) / 2
-    shapes['제주특별자치도'] = parts(translate(jeju, xoff=JEJU_CENTER[0] - jx, yoff=JEJU_CENTER[1] - jy))
 
     # 전체 범위 → SVG 좌표
     xs, ys = [], []
@@ -97,8 +91,6 @@ def main():
             b = p.bounds
             xs += [b[0], b[2]]
             ys += [b[1], b[3]]
-    xs += [JEJU_CENTER[0] - JEJU_BOX[0], JEJU_CENTER[0] + JEJU_BOX[0]]
-    ys += [JEJU_CENTER[1] - JEJU_BOX[1], JEJU_CENTER[1] + JEJU_BOX[1]]
     lon0, lat_top = min(xs), max(ys)
 
     def px(lon, lat):
@@ -124,14 +116,10 @@ def main():
         cx, cy = px(lx, ly)
         out.append({'province': province, 'd': d, 'cx': round(cx, 1), 'cy': round(cy, 1)})
 
-    bx0, by0 = px(JEJU_CENTER[0] - JEJU_BOX[0], JEJU_CENTER[1] + JEJU_BOX[1])
-    bx1, by1 = px(JEJU_CENTER[0] + JEJU_BOX[0], JEJU_CENTER[1] - JEJU_BOX[1])
-    box = {'x': round(bx0, 1), 'y': round(by0, 1), 'w': round(bx1 - bx0, 1), 'h': round(by1 - by0, 1)}
-
     ts = (
         '// 자동 생성 파일 — scripts/build-korea-map.py 로 만든다. 직접 고치지 말고 스크립트를 수정해 다시 돌릴 것.\n'
-        '// 경계 원본: 통계청 통계지리정보서비스(SGIS) 센서스용 행정구역경계 2018 (공공누리 제1유형), 단순화·합산·제주 이동 처리.\n'
-        f'export const KOREA_MAP = {json.dumps({"width": width, "height": height, "jejuBox": box, "provinces": out}, ensure_ascii=False)} as const;\n'
+        '// 경계 원본: 통계청 통계지리정보서비스(SGIS) 센서스용 행정구역경계 2018 (공공누리 제1유형), 단순화·합산 처리(제주 제외).\n'
+        f'export const KOREA_MAP = {json.dumps({"width": width, "height": height, "provinces": out}, ensure_ascii=False)} as const;\n'
     )
     OUT.write_text(ts, encoding='utf-8')
     print(f'{OUT.relative_to(ROOT)}: {len(ts)/1024:.0f}KB, viewBox {width}x{height}')

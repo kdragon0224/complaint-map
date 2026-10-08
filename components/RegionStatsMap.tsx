@@ -4,12 +4,11 @@ import { provinceOf, PROVINCE_OF } from '@/lib/sido-groups';
 import { KOREA_MAP } from '@/lib/korea-map-paths';
 
 // 경계선은 통계청 행정구역경계를 단순화한 것(lib/korea-map-paths.ts, scripts/build-korea-map.py로 생성).
-// 특별시·광역시는 소재 도 영역에 합쳐져 있고, 제주는 점선 상자 안으로 옮겨 그렸다.
+// 특별시·광역시는 소재 도 영역에 합쳐져 있고, 제주는 지도에 그리지 않는다(제주 조회 기록은 지도에 표시하지 않음).
 
 const SHORT: Record<string, string> = {
   '경기도': '경기', '강원특별자치도': '강원', '충청남도': '충남', '충청북도': '충북',
   '경상북도': '경북', '경상남도': '경남', '전북특별자치도': '전북', '전라남도': '전남',
-  '제주특별자치도': '제주',
   '서울특별시': '서울', '인천광역시': '인천', '대전광역시': '대전', '세종특별자치시': '세종',
   '대구광역시': '대구', '부산광역시': '부산', '울산광역시': '울산', '광주광역시': '광주',
 };
@@ -51,8 +50,8 @@ export default function RegionStatsMap({ counts: rawCounts, onHover }: Props) {
     const key = provinceOf(sido);
     counts[key] = (counts[key] ?? 0) + n;
   }
-  const max = Math.max(1, ...Object.values(counts));
-  const box = KOREA_MAP.jejuBox;
+  // 색 농도 기준은 지도에 그려진 권역만으로 잡는다 (제주 등 안 그리는 지역의 건수가 기준을 왜곡하지 않도록)
+  const max = Math.max(1, ...KOREA_MAP.provinces.map(p => counts[p.province] ?? 0));
 
   return (
     <svg
@@ -61,8 +60,6 @@ export default function RegionStatsMap({ counts: rawCounts, onHover }: Props) {
       role="img"
       aria-label="권역별 조회 건수 지도"
     >
-      <rect x={box.x} y={box.y} width={box.w} height={box.h} rx={6} fill="none" stroke="#94a3b8" strokeWidth={1} strokeDasharray="5 4" />
-
       {KOREA_MAP.provinces.map(({ province, d }) => (
         <path
           key={province}

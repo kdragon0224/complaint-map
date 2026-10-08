@@ -49,7 +49,6 @@ export default function StatsPage() {
 
   // 지역별 통계: month(YYYY-MM) -> sido -> 건수
   const [regionMonthly, setRegionMonthly] = useState<Record<string, Record<string, number>> | null>(null);
-  const [regionUnclassified, setRegionUnclassified] = useState(0);
   const [regionLoading, setRegionLoading] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [hoveredSido, setHoveredSido] = useState<string | null>(null);
@@ -67,7 +66,6 @@ export default function StatsPage() {
       if (page.length < 1000) break;
     }
     const byMonth: Record<string, Record<string, number>> = {};
-    let unclassified = 0;
     const ymFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit' });
     for (const row of data) {
       const parts = ymFormatter.formatToParts(new Date(row.queried_at as string));
@@ -75,10 +73,8 @@ export default function StatsPage() {
       if (!byMonth[ym]) byMonth[ym] = {};
       const sido = row.sido as string | null;
       if (sido) byMonth[ym][sido] = (byMonth[ym][sido] || 0) + 1;
-      else unclassified++;
     }
     setRegionMonthly(byMonth);
-    setRegionUnclassified(unclassified);
     setSelectedMonth(prev => prev ?? Object.keys(byMonth).sort().pop() ?? null);
     setRegionLoading(false);
   }, []);
@@ -348,14 +344,13 @@ export default function StatsPage() {
                   <p className="text-sm font-semibold text-gray-700 mb-1">
                     🗺️ {selectedMonth} 권역별 조회 건수
                   </p>
-                  <p className="text-[10px] text-gray-400 mb-3">
-                    특별시·광역시는 소재 도에 합산, 제주는 점선 상자로 옮겨 표시(아래 순위는 시도별 그대로) · 경계: 통계청 SGIS 행정구역경계(공공누리 제1유형)를 단순화
-                    {regionUnclassified > 0 && ` · 전체 기간 시도 미분류 ${regionUnclassified.toLocaleString()}건(바다 위 좌표 등 행정구역 없음)`}
-                  </p>
+                  <p className="text-[10px] text-gray-400 mb-3">특별시·광역시는 소재 도에 합산</p>
                   <RegionStatsMap
                     counts={selectedMonth ? regionMonthly[selectedMonth] ?? {} : {}}
                     onHover={setHoveredSido}
                   />
+                  {/* 공공누리 제1유형: 출처 표시 조건 */}
+                  <p className="text-[9px] text-gray-300 text-right mt-1">경계: 통계청 SGIS 행정구역경계(공공누리 제1유형) 단순화</p>
                 </div>
 
                 {/* 순위 목록 (정확한 숫자 확인용) */}
