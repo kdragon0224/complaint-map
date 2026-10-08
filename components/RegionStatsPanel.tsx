@@ -1,11 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabase';
 import { provinceOf } from '@/lib/sido-groups';
+import RegionStatsMap from '@/components/RegionStatsMap'; // 순수 SVG라 SSR 가능 — 늦게 불러오면 데이터만 먼저 뜨고 지도가 비어 보이는 깜빡임이 생긴다
 
-const RegionStatsMap = dynamic(() => import('@/components/RegionStatsMap'), { ssr: false });
 
 // 월별 시도 조회 건수를 지도+순위로 보여주는 패널. /stats 의 "지역별 통계" 탭(관리자)과 공개 페이지 /region-stats 에서 함께 쓴다.
 // 시도별 건수만 집계하므로 주소·좌표 같은 개별 조회 내용은 이 패널에서 읽지도, 보여주지도 않는다.
@@ -19,14 +18,14 @@ export default function RegionStatsPanel() {
     setRegionLoading(true);
     // sido/queried_at 두 컬럼만 — 전체 기간 집계용이라 overview의 500건 샘플과 별도로 전수 조회
     // Supabase는 한 번에 최대 1,000행만 돌려주므로(limit을 크게 줘도 잘림) 1,000행씩 페이지를 넘겨 전부 모은다
-    const data: { sido: string | null; queried_at: string }[] = [];
-    for (let from = 0; ; from += 1000) {
-      const { data: page } = await supabase
-        .from('query_logs').select('sido, queried_at').order('id', { ascending: true }).range(from, from + 999);
-      if (!page || page.length === 0) break;
-      data.push(...(page as { sido: string | null; queried_at: string }[]));
-      if (page.length < 1000) break;
-    }
+    // 전체 건수를 먼저 세고 1,000행짜리 페이지를 한꺼번에(병렬로) 받아 대기 시간을 줄인다
+    const { count } = await supabase.from('query_logs').select('*', { count: 'exact', head: true });
+    const pageStarts: number[] = [];
+    for (let from = 0; from < (count ?? 0); from += 1000) pageStarts.push(from);
+    const pages = await Promise.all(pageStarts.map(from =>
+      supabase.from('query_logs').select('sido, queried_at').order('id', { ascending: true }).range(from, from + 999)
+    ));
+    const data: { sido: string | null; queried_at: string }[] = pages.flatMap(r => (r.data ?? []) as { sido: string | null; queried_at: string }[]);
     const byMonth: Record<string, Record<string, number>> = {};
     const ymFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit' });
     for (const row of data) {
