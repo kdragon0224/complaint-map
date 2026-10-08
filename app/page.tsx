@@ -36,9 +36,9 @@ interface GeocodeCandidate {
   lng: number;
 }
 
-// 한국도로공사 전북본부 (전주시 덕진구 번영로 420)
-const DEFAULT_LAT = 35.8738772526154;
-const DEFAULT_LNG = 127.05213812858;
+// 앱을 열었을 때 지도가 처음 가리키는 위치
+const DEFAULT_LAT = 37.3651975689158; // 시작 위치: 서울TG (카카오 키워드 검색 "서울TG", 경기 성남시 분당구 궁내동)
+const DEFAULT_LNG = 127.103521877713;
 
 export default function Home() {
   const [address, setAddress] = useState('');
