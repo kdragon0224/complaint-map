@@ -1,31 +1,26 @@
 'use client';
 
-// 대한민국 17개 시도를 "정확한 경계"가 아니라 상대적 위치를 살린 간략화된 격자(카토그램)로
-// 배치한다 — 실제 해안선·경계선 좌표 데이터 없이도 "대략 어디쯤"인지 한눈에 들어오게 하기 위함.
-// col: 서쪽(0)→동쪽, row: 북쪽(0)→남쪽.
-const SIDO_GRID: { sido: string; col: number; row: number; rowSpan?: number }[] = [
-  { sido: '강원특별자치도', col: 3, row: 0 },
-  { sido: '인천광역시', col: 0, row: 1 },
-  { sido: '서울특별시', col: 1, row: 1 },
-  { sido: '경기도', col: 2, row: 1 },
-  { sido: '충청북도', col: 3, row: 1 },
-  { sido: '충청남도', col: 1, row: 2 },
-  { sido: '세종특별자치시', col: 2, row: 2 },
-  { sido: '경상북도', col: 4, row: 2 },
-  { sido: '전북특별자치도', col: 1, row: 3 },
-  { sido: '대전광역시', col: 2, row: 3 },
-  { sido: '대구광역시', col: 4, row: 3 },
-  { sido: '전남광주통합특별시', col: 1, row: 4, rowSpan: 2 },
-  { sido: '경상남도', col: 4, row: 4 },
-  { sido: '울산광역시', col: 5, row: 4 },
-  { sido: '부산광역시', col: 5, row: 5 },
-  { sido: '제주특별자치도', col: 1, row: 7 },
-];
+import { provinceOf, PROVINCE_OF } from '@/lib/sido-groups';
+import { KOREA_MAP } from '@/lib/korea-map-paths';
 
-const CELL = 72;
-const PAD = 16;
-const COLS = 6;
-const ROWS = 8;
+// 경계선은 통계청 행정구역경계를 단순화한 것(lib/korea-map-paths.ts, scripts/build-korea-map.py로 생성).
+// 특별시·광역시는 소재 도 영역에 합쳐져 있고, 제주는 점선 상자 안으로 옮겨 그렸다.
+
+const SHORT: Record<string, string> = {
+  '경기도': '경기', '강원특별자치도': '강원', '충청남도': '충남', '충청북도': '충북',
+  '경상북도': '경북', '경상남도': '경남', '전북특별자치도': '전북', '전라남도': '전남',
+  '제주특별자치도': '제주',
+  '서울특별시': '서울', '인천광역시': '인천', '대전광역시': '대전', '세종특별자치시': '세종',
+  '대구광역시': '대구', '부산광역시': '부산', '울산광역시': '울산', '광주광역시': '광주',
+};
+
+// 도별로 합산된 특별시·광역시 이름 ("서울·인천 포함"). 전남광주통합특별시는 광주를 이미 포함하므로 광주만 표기.
+const ABSORBED_NOTE: Record<string, string> = {};
+for (const sido of Object.keys(PROVINCE_OF)) {
+  if (sido === '전남광주통합특별시') continue;
+  const p = PROVINCE_OF[sido];
+  ABSORBED_NOTE[p] = (ABSORBED_NOTE[p] ? ABSORBED_NOTE[p] + '·' : '') + SHORT[sido];
+}
 
 function colorFor(ratio: number) {
   // ratio 0~1 — 낮으면 연한 파랑, 높으면 진한 남색 (사이트 포인트 컬러 #0d2d6b 톤 유지)
@@ -46,72 +41,62 @@ function colorFor(ratio: number) {
 }
 
 interface Props {
-  counts: Record<string, number>; // sido -> 해당 월 조회 건수
-  onHover?: (sido: string | null) => void;
+  counts: Record<string, number>; // 시도 -> 해당 월 조회 건수 (특별시·광역시도 원래 이름 그대로 들어온다)
+  onHover?: (province: string | null) => void;
 }
-
-// 카카오가 광주·전남을 "전남광주통합특별시"로 반환한다 (lib/road-rules.ts의 행정구역 통합 대응과 동일).
-// 옛 이름(광주광역시/전라남도)으로 저장된 값이 섞여 있어도 통합 칸으로 합산한다.
-const MERGED_SIDO: Record<string, string> = {
-  '광주광역시': '전남광주통합특별시',
-  '전라남도': '전남광주통합특별시',
-};
-const SHORT_LABEL: Record<string, string> = { '전남광주통합특별시': '전남·광주' };
 
 export default function RegionStatsMap({ counts: rawCounts, onHover }: Props) {
   const counts: Record<string, number> = {};
   for (const [sido, n] of Object.entries(rawCounts)) {
-    const key = MERGED_SIDO[sido] ?? sido;
+    const key = provinceOf(sido);
     counts[key] = (counts[key] ?? 0) + n;
   }
   const max = Math.max(1, ...Object.values(counts));
-  const width = PAD * 2 + COLS * CELL;
-  const height = PAD * 2 + ROWS * CELL;
+  const box = KOREA_MAP.jejuBox;
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto select-none" role="img" aria-label="시도별 조회 건수 지도">
-      {SIDO_GRID.map(({ sido, col, row, rowSpan = 1 }) => {
-        const cellH = CELL * rowSpan - 6;
-        const x = PAD + col * CELL;
-        const y = PAD + row * CELL;
-        const count = counts[sido] ?? 0;
-        const ratio = count / max;
+    <svg
+      viewBox={`0 0 ${KOREA_MAP.width} ${KOREA_MAP.height}`}
+      className="w-full max-w-lg mx-auto h-auto select-none"
+      role="img"
+      aria-label="권역별 조회 건수 지도"
+    >
+      <rect x={box.x} y={box.y} width={box.w} height={box.h} rx={6} fill="none" stroke="#94a3b8" strokeWidth={1} strokeDasharray="5 4" />
+
+      {KOREA_MAP.provinces.map(({ province, d }) => (
+        <path
+          key={province}
+          d={d}
+          fillRule="evenodd"
+          fill={colorFor((counts[province] ?? 0) / max)}
+          stroke="#ffffff"
+          strokeWidth={1.2}
+          strokeLinejoin="round"
+          className="cursor-default transition-opacity hover:opacity-80"
+          onMouseEnter={() => onHover?.(province)}
+          onMouseLeave={() => onHover?.(null)}
+        />
+      ))}
+
+      {/* 숫자는 이웃 도형에 가리지 않도록 도형을 전부 그린 뒤 얹는다 */}
+      {KOREA_MAP.provinces.map(({ province, cx, cy }) => {
+        const count = counts[province] ?? 0;
+        const dark = count / max > 0.55;
+        const note = ABSORBED_NOTE[province];
+        const y = cy + (note ? -8 : 0);
         return (
-          <g
-            key={sido}
-            transform={`translate(${x}, ${y})`}
-            onMouseEnter={() => onHover?.(sido)}
-            onMouseLeave={() => onHover?.(null)}
-            className="cursor-default"
-          >
-            <rect
-              width={CELL - 6}
-              height={cellH}
-              rx={10}
-              fill={colorFor(ratio)}
-              stroke="#c7cfe0"
-              strokeWidth={1}
-            />
-            <text
-              x={(CELL - 6) / 2}
-              y={cellH / 2 - 6}
-              textAnchor="middle"
-              fontSize={12}
-              fill={ratio > 0.55 ? '#ffffff' : '#334155'}
-              fontWeight={600}
-            >
-              {SHORT_LABEL[sido] ?? sido.replace(/(특별자치|광역|특별)?(시|도)$/, '')}
+          <g key={province} pointerEvents="none" textAnchor="middle">
+            <text x={cx} y={y - 6} fontSize={14} fontWeight={600} fill={dark ? '#ffffff' : '#334155'}>
+              {SHORT[province]}
             </text>
-            <text
-              x={(CELL - 6) / 2}
-              y={cellH / 2 + 14}
-              textAnchor="middle"
-              fontSize={15}
-              fill={ratio > 0.55 ? '#ffffff' : '#0d2d6b'}
-              fontWeight={700}
-            >
+            <text x={cx} y={y + 15} fontSize={20} fontWeight={700} fill={dark ? '#ffffff' : '#0d2d6b'}>
               {count.toLocaleString()}
             </text>
+            {note && (
+              <text x={cx} y={y + 30} fontSize={11} fill={dark ? '#dbe5fa' : '#64748b'}>
+                {note} 포함
+              </text>
+            )}
           </g>
         );
       })}

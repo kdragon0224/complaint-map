@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
+import { provinceOf } from '@/lib/sido-groups';
 
 const KakaoMap = dynamic(() => import('@/components/KakaoMap'), { ssr: false });
 const RegionStatsMap = dynamic(() => import('@/components/RegionStatsMap'), { ssr: false });
@@ -345,10 +346,10 @@ export default function StatsPage() {
                 {/* 지도 */}
                 <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
                   <p className="text-sm font-semibold text-gray-700 mb-1">
-                    🗺️ {selectedMonth} 시도별 조회 건수
+                    🗺️ {selectedMonth} 권역별 조회 건수
                   </p>
                   <p className="text-[10px] text-gray-400 mb-3">
-                    실제 행정구역 경계가 아닌 상대 위치 기준 간략 배치도입니다
+                    특별시·광역시는 소재 도에 합산, 제주는 점선 상자로 옮겨 표시(아래 순위는 시도별 그대로) · 경계: 통계청 SGIS 행정구역경계(공공누리 제1유형)를 단순화
                     {regionUnclassified > 0 && ` · 전체 기간 시도 미분류 ${regionUnclassified.toLocaleString()}건(바다 위 좌표 등 행정구역 없음)`}
                   </p>
                   <RegionStatsMap
@@ -368,7 +369,7 @@ export default function StatsPage() {
                     return (
                       <div className="flex flex-col gap-2">
                         {ranked.map(([sido, count]) => (
-                          <div key={sido} className={`flex items-center gap-2 rounded-lg px-1 ${hoveredSido === sido ? 'bg-blue-50' : ''}`}>
+                          <div key={sido} className={`flex items-center gap-2 rounded-lg px-1 ${hoveredSido !== null && provinceOf(sido) === hoveredSido ? 'bg-blue-50' : ''}`}>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between mb-0.5">
                                 <p className="text-xs text-gray-700">{sido}</p>
