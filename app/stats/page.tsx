@@ -173,7 +173,7 @@ export default function StatsPage() {
                 tab === t ? 'bg-[#0d2d6b] text-white' : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-100'
               }`}
             >
-              {t === 'overview' ? '📊 통계 요약' : t === 'region' ? '🗺️ 지역별 통계' : '📋 조회 기록'}
+              {t === 'overview' ? '📊 통계 요약' : t === 'region' ? '지역별 통계' : '📋 조회 기록'}
             </button>
           ))}
           <button onClick={fetchLogs} className="ml-auto text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">

@@ -185,7 +185,7 @@ export default function Home() {
             title="지역별 통계"
             className="bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-2.5 sm:px-3 py-1.5 rounded-full transition-colors whitespace-nowrap"
           >
-            🗺️<span className="hidden sm:inline"> 지역별 통계</span>
+            <span className="sm:hidden">통계</span><span className="hidden sm:inline">지역별 통계</span>
           </Link>
           <Link
             href="/admin"
