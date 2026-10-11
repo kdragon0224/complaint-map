@@ -84,7 +84,7 @@ export default function RegionStatsPanel() {
         {/* 지도 */}
         <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
           <p className="text-sm font-semibold text-gray-700 mb-1">
-            🗺️ {selectedMonth} 권역별 조회 건수
+            🗺️ {selectedMonth} 권역별 조회 건수(총 {Object.values(selectedMonth ? regionMonthly[selectedMonth] ?? {} : {}).reduce((a, b) => a + b, 0).toLocaleString()}건)
           </p>
           <p className="text-[10px] text-gray-400 mb-3">특별시·광역시는 소재 도에 합산</p>
           <RegionStatsMap
