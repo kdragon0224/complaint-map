@@ -11,7 +11,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
@@ -39,7 +39,8 @@ function parseCSV(text) {
 
 function toUTF8(filePath) {
   // maxBuffer 100MB로 설정 (대용량 파일 대응)
-  return execSync(`iconv -f EUC-KR -t UTF-8 "${filePath}"`, {
+  // 셸을 거치지 않고 인자 배열로 호출 — 파일명에 특수문자가 있어도 명령으로 해석되지 않는다
+  return execFileSync('iconv', ['-f', 'EUC-KR', '-t', 'UTF-8', filePath], {
     maxBuffer: 100 * 1024 * 1024,
   }).toString();
 }
