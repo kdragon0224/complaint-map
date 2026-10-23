@@ -5,7 +5,19 @@ import { useSearchParams } from 'next/navigation';
 import { supabase, Post, Comment } from '@/lib/supabase';
 import Link from 'next/link';
 
-const ADMIN_PASSWORD = '2504';
+// 관리자 비밀번호는 서버(/api/admin-auth, 환경변수 ADMIN_PASSWORD)에서만 확인한다
+async function verifyAdminPassword(password: string): Promise<boolean> {
+  try {
+    const res = await fetch('/api/admin-auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    });
+    return res.ok && (await res.json()).ok === true;
+  } catch {
+    return false;
+  }
+}
 
 function timeAgo(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -147,8 +159,8 @@ function FeedbackPageInner() {
     }
   };
 
-  const handleAdminLogin = () => {
-    if (adminPw === ADMIN_PASSWORD) {
+  const handleAdminLogin = async () => {
+    if (await verifyAdminPassword(adminPw)) {
       setIsAdmin(true);
       setShowAdminLogin(false);
       setAdminPw('');

@@ -8,7 +8,19 @@ import RegionStatsPanel from '@/components/RegionStatsPanel';
 
 const KakaoMap = dynamic(() => import('@/components/KakaoMap'), { ssr: false });
 
-const ADMIN_PASSWORD = '2504';
+// 관리자 비밀번호는 서버(/api/admin-auth, 환경변수 ADMIN_PASSWORD)에서만 확인한다
+async function verifyAdminPassword(password: string): Promise<boolean> {
+  try {
+    const res = await fetch('/api/admin-auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    });
+    return res.ok && (await res.json()).ok === true;
+  } catch {
+    return false;
+  }
+}
 
 interface Log {
   id: number;
@@ -62,8 +74,8 @@ export default function StatsPage() {
 
   useEffect(() => { if (isAdmin) fetchLogs(); }, [isAdmin, fetchLogs]);
 
-  const handleLogin = () => {
-    if (pw === ADMIN_PASSWORD) { setIsAdmin(true); setPwError(''); }
+  const handleLogin = async () => {
+    if (await verifyAdminPassword(pw)) { setIsAdmin(true); setPwError(''); }
     else setPwError('비밀번호가 틀렸습니다.');
   };
 
